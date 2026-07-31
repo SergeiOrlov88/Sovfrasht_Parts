@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarinePartID — интерактивный прототип</title>
+<style>
+  :root{
+    --bg:#0a1420; --bg2:#0f1e30; --panel:#132639; --panel2:#18324a;
+    --line:#22405c; --ink:#eaf2fb; --mut:#8aa6c2; --mut2:#5f7d9c;
+    --acc:#2fc4a3; --acc2:#38b6ff; --warn:#f0a341; --bad:#f2607a;
+    --good:#2fc4a3; --chip:#1c3350;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 700px at 70% -10%,#173350 0%,#0a1420 55%) no-repeat,#0a1420;
+    color:var(--ink); min-height:100vh; padding:28px 16px 60px;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .head{max-width:920px;width:100%;text-align:center;margin-bottom:22px}
+  .brand{display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:20px;letter-spacing:.3px}
+  .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--acc2));
+    display:grid;place-items:center;color:#04121b;font-weight:900;font-size:16px}
+  .tag{color:var(--mut);font-size:14px;margin-top:8px}
+  .demo-note{display:inline-block;margin-top:12px;font-size:12px;color:var(--mut2);
+    background:var(--panel);border:1px solid var(--line);padding:6px 12px;border-radius:20px}
+
+  .stage{display:flex;gap:34px;align-items:flex-start;justify-content:center;flex-wrap:wrap;max-width:960px;width:100%}
+
+  /* phone */
+  .phone{width:340px;flex:0 0 340px;background:#05101b;border-radius:38px;padding:12px;
+    box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 0 1px #1d3350 inset;border:1px solid #12283d;position:relative}
+  .notch{position:absolute;top:20px;left:50%;transform:translateX(-50%);width:120px;height:24px;background:#05101b;border-radius:0 0 16px 16px;z-index:5}
+  .screen{background:var(--bg);border-radius:28px;overflow:hidden;height:660px;position:relative;display:flex;flex-direction:column}
+  .statusbar{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:12px;color:var(--mut);flex:0 0 auto}
+  .appbar{padding:6px 18px 12px;flex:0 0 auto}
+  .appbar h1{font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .appbar .sub{font-size:12px;color:var(--mut);margin-top:2px}
+
+  .body{flex:1 1 auto;overflow-y:auto;padding:6px 16px 90px}
+  .body::-webkit-scrollbar{width:0}
+
+  /* role switch */
+  .roles{display:flex;gap:6px;padding:2px 16px 10px}
+  .role{flex:1;text-align:center;font-size:11px;padding:7px 4px;border-radius:10px;background:var(--panel);
+    border:1px solid var(--line);color:var(--mut);cursor:pointer;transition:.15s;user-select:none}
+  .role.active{background:linear-gradient(135deg,rgba(47,196,163,.22),rgba(56,182,255,.18));
+    border-color:var(--acc);color:var(--ink);font-weight:600}
+
+  /* capture screen */
+  .viewfinder{margin:6px 0 14px;height:250px;border-radius:20px;position:relative;overflow:hidden;
+    background:linear-gradient(160deg,#0d2032,#0a1826);border:1px solid var(--line)}
+  .vf-grid{position:absolute;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:34px 34px;opacity:.25}
+  .vf-corner{position:absolute;width:26px;height:26px;border:3px solid var(--acc)}
+  .vf-corner.tl{top:16px;left:16px;border-right:0;border-bottom:0;border-radius:6px 0 0 0}
+  .vf-corner.tr{top:16px;right:16px;border-left:0;border-bottom:0;border-radius:0 6px 0 0}
+  .vf-corner.bl{bottom:16px;left:16px;border-right:0;border-top:0;border-radius:0 0 0 6px}
+  .vf-corner.br{bottom:16px;right:16px;border-left:0;border-top:0;border-radius:0 0 6px 0}
+  .vf-hint{position:absolute;bottom:14px;left:0;right:0;text-align:center;font-size:12px;color:var(--mut)}
+  .vf-part{position:absolute;inset:0;display:grid;place-items:center;font-size:78px;filter:drop-shadow(0 8px 22px rgba(0,0,0,.5))}
+  .scanline{position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--acc),transparent);box-shadow:0 0 14px var(--acc);animation:scan 1.6s linear infinite;display:none}
+  @keyframes scan{0%{top:6%}100%{top:94%}}
+
+  .pick-title{font-size:12px;color:var(--mut);margin:4px 2px 10px;text-transform:uppercase;letter-spacing:.5px}
+  .samples{display:flex;flex-direction:column;gap:10px}
+  .sample{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:var(--panel);border:1px solid var(--line);cursor:pointer;transition:.15s}
+  .sample:hover{border-color:var(--acc);transform:translateY(-1px);background:var(--panel2)}
+  .sample .emo{font-size:26px;width:44px;height:44px;display:grid;place-items:center;background:#0c1c2c;border-radius:11px;flex:0 0 44px}
+  .sample .nm{font-size:14px;font-weight:600}
+  .sample .ds{font-size:11.5px;color:var(--mut);margin-top:2px}
+  .sample .go{margin-left:auto;color:var(--acc);font-size:20px}
+
+  /* scanning overlay */
+  .scanmsg{text-align:center;margin-top:16px;font-size:13px;color:var(--mut);min-height:20px}
+  .steps{margin:16px 6px 0;display:flex;flex-direction:column;gap:10px}
+  .step{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--mut2);opacity:.5;transition:.3s}
+  .step.on{opacity:1;color:var(--ink)}
+  .step .dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);flex:0 0 18px;display:grid;place-items:center;font-size:10px}
+  .step.on .dot{border-color:var(--acc);background:var(--acc);color:#04121b}
+
+  /* result */
+  .conf{display:flex;align-items:center;gap:10px;margin:4px 0 12px}
+  .conf-bar{flex:1;height:8px;background:var(--panel);border-radius:6px;overflow:hidden}
+  .conf-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--acc),var(--acc2));width:0;transition:width .8s ease}
+  .conf-val{font-size:13px;font-weight:700;color:var(--acc)}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+  .card h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-bottom:10px;font-weight:600}
+  .partname{font-size:19px;font-weight:700;margin-bottom:2px}
+  .parteq{font-size:12.5px;color:var(--mut)}
+  .kv{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .kv:last-child{border:0}
+  .kv .k{color:var(--mut)}
+  .kv .v{font-weight:600;text-align:right}
+  .code{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0c1c2c;padding:2px 8px;border-radius:6px;color:var(--acc);font-weight:700}
+
+  .tabs{display:flex;gap:6px;margin:2px 0 12px;background:var(--panel);padding:4px;border-radius:12px}
+  .tab{flex:1;text-align:center;font-size:12.5px;padding:8px;border-radius:9px;color:var(--mut);cursor:pointer;transition:.15s}
+  .tab.active{background:var(--panel2);color:var(--ink);font-weight:600;box-shadow:0 1px 0 rgba(255,255,255,.03)}
+
+  .alt{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .alt:last-child{border:0}
+  .alt .b{width:6px;height:6px;border-radius:50%;background:var(--acc2)}
+
+  .supplier{display:flex;align-items:center;gap:11px;padding:12px;border-radius:13px;background:var(--panel);border:1px solid var(--line);margin-bottom:10px}
+  .supplier .av{width:38px;height:38px;border-radius:9px;background:#0c1c2c;display:grid;place-items:center;font-weight:800;font-size:13px;color:var(--acc2);flex:0 0 38px}
+  .supplier .nm{font-size:13.5px;font-weight:600}
+  .supplier .meta{font-size:11.5px;color:var(--mut);margin-top:2px}
+  .supplier .price{margin-left:auto;text-align:right}
+  .supplier .price .p{font-weight:700;font-size:14px}
+  .supplier .price .d{font-size:11px;color:var(--mut)}
+  .stock{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:20px;margin-top:3px}
+  .stock.in{background:rgba(47,196,163,.15);color:var(--good)}
+  .stock.low{background:rgba(240,163,65,.15);color:var(--warn)}
+
+  .repair-verdict{padding:14px;border-radius:14px;margin-bottom:12px;border:1px solid}
+  .repair-verdict.replace{background:rgba(56,182,255,.08);border-color:rgba(56,182,255,.35)}
+  .repair-verdict.repair{background:rgba(47,196,163,.08);border-color:rgba(47,196,163,.35)}
+  .repair-verdict .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .repair-verdict .big{font-size:17px;font-weight:700;margin:3px 0 6px}
+  .repair-verdict .why{font-size:12.5px;color:var(--mut);line-height:1.5}
+  .cmp{display:flex;gap:10px;margin-top:12px}
+  .cmp .col{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px}
+  .cmp .col h4{font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:6px}
+  .cmp .col .n{font-size:16px;font-weight:700}
+  .cmp .col .s{font-size:11px;color:var(--mut);margin-top:2px}
+
+  /* bottom action */
+  .fab{position:absolute;left:16px;right:16px;bottom:18px;z-index:8}
+  .btn{width:100%;padding:15px;border:0;border-radius:15px;font-size:15px;font-weight:700;cursor:pointer;
+    background:linear-gradient(135deg,var(--acc),var(--acc2));color:#04121b;box-shadow:0 12px 26px rgba(47,196,163,.3)}
+  .btn.ghost{background:var(--panel);color:var(--ink);border:1px solid var(--line);box-shadow:none}
+  .btn:active{transform:translateY(1px)}
+  .btnrow{display:flex;gap:10px}
+  .btnrow .btn{margin:0}
+
+  /* side explainer (desktop) */
+  .side{flex:1 1 300px;max-width:360px;min-width:280px}
+  .side .blk{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+  .side .blk h2{font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .side .blk p{font-size:13px;color:var(--mut);line-height:1.6}
+  .side .blk .num{color:var(--acc);font-weight:800}
+  .flow{list-style:none;display:flex;flex-direction:column;gap:12px}
+  .flow li{display:flex;gap:12px;font-size:13px;color:var(--mut);line-height:1.5}
+  .flow li b{color:var(--ink)}
+  .flow .n{width:24px;height:24px;border-radius:50%;background:#0c1c2c;border:1px solid var(--acc);color:var(--acc);display:grid;place-items:center;font-size:12px;font-weight:700;flex:0 0 24px}
+  .foot{max-width:920px;text-align:center;font-size:12px;color:var(--mut2);margin-top:26px;line-height:1.6}
+  a{color:var(--acc2)}
+  @media(max-width:760px){.side{display:none}}
+</style>
+</head>
+<body>
+  <div class="head">
+    <div class="brand"><span class="logo">⚓</span> MarinePartID</div>
+    <div class="tag">Распознавание судовых деталей по фото · закупка · ремонт</div>
+    <div class="demo-note">Интерактивный прототип · распознавание имитируется на демо-данных</div>
+  </div>
+
+  <div class="stage">
+    <!-- PHONE -->
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="statusbar"><span>9:41</span><span>◐ 5G ▮▮▮</span></div>
+
+        <!-- ===== SCREEN 1: CAPTURE ===== -->
+        <div id="s-capture">
+          <div class="appbar">
+            <h1>📷 Сканировать деталь</h1>
+            <div class="sub" id="roleHint">Наведите камеру на деталь и её табличку</div>
+          </div>
+          <div class="roles">
+            <div class="role active" data-role="mech">Механик</div>
+            <div class="role" data-role="owner">Судовладелец</div>
+            <div class="role" data-role="yard">Верфь</div>
+          </div>
+          <div class="body">
+            <div class="viewfinder">
+              <div class="vf-grid"></div>
+              <div class="vf-part" id="vfPart">🔩</div>
+              <div class="scanline" id="scanline"></div>
+              <div class="vf-corner tl"></div><div class="vf-corner tr"></div>
+              <div class="vf-corner bl"></div><div class="vf-corner br"></div>
+              <div class="vf-hint">Совет: снимите шильдик с номером — это повышает точность</div>
+            </div>
+            <div class="pick-title">Демо: выберите деталь для распознавания</div>
+            <div class="samples" id="samples"></div>
+          </div>
+        </div>
+
+        <!-- ===== SCREEN 2: SCANNING ===== -->
+        <div id="s-scan" style="display:none">
+          <div class="appbar"><h1>🔍 Распознавание…</h1><div class="sub">Анализ фото и маркировки</div></div>
+          <div class="body">
+            <div class="viewfinder">
+              <div class="vf-grid"></div>
+              <div class="vf-part" id="scanPart">🔩</div>
+              <div class="scanline" style="display:block"></div>
+              <div class="vf-corner tl"></div><div class="vf-corner tr"></div>
+              <div class="vf-corner bl"></div><div class="vf-corner br"></div>
+            </div>
+            <div class="scanmsg" id="scanmsg">Инициализация…</div>
+            <div class="steps" id="steps">
+              <div class="step" data-i="0"><span class="dot">1</span> Компьютерное зрение: тип детали</div>
+              <div class="step" data-i="1"><span class="dot">2</span> OCR: чтение маркировки и номера</div>
+              <div class="step" data-i="2"><span class="dot">3</span> Поиск по каталогу IMPA/ISSA</div>
+              <div class="step" data-i="3"><span class="dot">4</span> Подбор поставщиков и аналогов</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== SCREEN 3: RESULT ===== -->
+        <div id="s-result" style="display:none">
+          <div class="appbar">
+            <h1 style="font-size:15px">✅ Деталь определена</h1>
+            <div class="sub">Проверьте результат перед заказом</div>
+          </div>
+          <div class="body" style="padding-bottom:96px">
+            <div class="conf">
+              <span style="font-size:12px;color:var(--mut)">Достоверность</span>
+              <div class="conf-bar"><div class="conf-fill" id="confFill"></div></div>
+              <span class="conf-val" id="confVal">0%</span>
+            </div>
+
+            <div class="card">
+              <div class="partname" id="rName">—</div>
+              <div class="parteq" id="rEq">—</div>
+            </div>
+
+            <div class="tabs">
+              <div class="tab active" data-tab="report">Отчёт</div>
+              <div class="tab" data-tab="buy">Закупка</div>
+              <div class="tab" data-tab="fix">Ремонт</div>
+            </div>
+
+            <div id="tab-report">
+              <div class="card">
+                <h3>Идентификация</h3>
+                <div class="kv"><span class="k">Код IMPA</span><span class="v"><span class="code" id="rImpa">—</span></span></div>
+                <div class="kv"><span class="k">Код ISSA</span><span class="v" id="rIssa">—</span></div>
+                <div class="kv"><span class="k">Производитель</span><span class="v" id="rMaker">—</span></div>
+                <div class="kv"><span class="k">Номер (OEM)</span><span class="v" id="rOem">—</span></div>
+                <div class="kv"><span class="k">Оборудование</span><span class="v" id="rEquip">—</span></div>
+              </div>
+              <div class="card">
+                <h3>Характеристики</h3>
+                <div id="rSpecs"></div>
+              </div>
+              <div class="card">
+                <h3>Аналоги и заменители</h3>
+                <div id="rAlts"></div>
+              </div>
+            </div>
+
+            <div id="tab-buy" style="display:none">
+              <div id="rSuppliers"></div>
+              <div style="font-size:11px;color:var(--mut2);text-align:center;margin-top:4px">
+                Цены и сроки — демо-данные. В продукте — актуальные прайсы поставщиков и площадок (ShipServ и др.)
+              </div>
+            </div>
+
+            <div id="tab-fix" style="display:none">
+              <div id="rRepair"></div>
+            </div>
+          </div>
+          <div class="fab">
+            <div class="btnrow">
+              <button class="btn ghost" style="flex:0 0 46%" onclick="reset()">↺ Заново</button>
+              <button class="btn" style="flex:1" id="mainCta">Оформить заявку</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SIDE EXPLAINER -->
+    <div class="side">
+      <div class="blk">
+        <h2>🧭 Что показывает прототип</h2>
+        <p>Это кликабельная демо-версия потока приложения. Выберите деталь на экране телефона — прототип имитирует гибридное распознавание (зрение + OCR + поиск по каталогу) и показывает готовый отчёт, поставщиков и рекомендацию «ремонт или замена».</p>
+      </div>
+      <div class="blk">
+        <h2>⚙️ Как работает распознавание</h2>
+        <ul class="flow">
+          <li><span class="n">1</span><span><b>Съёмка.</b> Фото детали и её шильдика с номером.</span></li>
+          <li><span class="n">2</span><span><b>Гибридный анализ.</b> Зрение определяет тип, OCR читает маркировку.</span></li>
+          <li><span class="n">3</span><span><b>Код IMPA/ISSA.</b> Сопоставление с отраслевым каталогом — ключ к закупке.</span></li>
+          <li><span class="n">4</span><span><b>Действие.</b> Отчёт → поставщики и цены → решение по ремонту.</span></li>
+        </ul>
+      </div>
+      <div class="blk">
+        <h2>🎯 Роль меняет акцент</h2>
+        <p>Переключатель <b>Механик / Судовладелец / Верфь</b> вверху экрана меняет главное действие: заявка на борту, добавление в реестр флота или в смету ремонта — под сценарий каждой из трёх групп пользователей.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    Прототип концепции MarinePartID. Распознавание имитируется на демонстрационных данных.<br>
+    Отраслевые стандарты: коды IMPA/ISSA (Marine Stores Guide) · площадка снабжения ShipServ.
+  </div>
+
+<script>
+const PARTS = [
+  {
+    emo:"⛽", name:"Топливная форсунка (инжектор)",
+    eq:"Главный двигатель · топливная аппаратура",
+    conf:94,
+    impa:"593512", issa:"75.301.12", maker:"Wärtsilä", oem:"W-32 / 148821",
+    equip:"Wärtsilä 6L32 (главный ДВС)",
+    specs:[["Тип","Электрогидравлическая форсунка"],["Давление впрыска","до 1800 бар"],["Материал распылителя","Легированная сталь"],["Ресурс","≈ 12 000 ч"]],
+    alts:["OEM-аналог: L32-148821 (совместимый)","Восстановленная (reman) форсунка","Распылитель отдельно (ремкомплект)"],
+    suppliers:[
+      {av:"SS",nm:"ShipServ Pages",meta:"B2B-площадка · 40+ поставщиков",price:"$1 240",d:"7–10 дн",stock:"in",st:"В наличии"},
+      {av:"MP",nm:"Marine Parts Direct",meta:"OEM Wärtsilä · Роттердам",price:"$1 390",d:"3–5 дн",stock:"in",st:"В наличии"},
+      {av:"RE",nm:"ReMarine (reman)",meta:"Восстановленная · гарантия 12 мес",price:"$690",d:"5–8 дн",stock:"low",st:"Мало"},
+    ],
+    repair:{verdict:"replace",big:"Рекомендуется замена",
+      why:"Форсунка отработала ~11 500 ч, распылитель изношен. Восстановление возможно (замена распылителя), но при таком ресурсе экономичнее заменить узел. Как компромисс — восстановленная (reman) форсунка вдвое дешевле новой.",
+      buy:"$1 240",fix:"$690",buyS:"новая, 7–10 дн",fixS:"reman, 5–8 дн"}
+  },
+  {
+    emo:"🌀", name:"Рабочее колесо насоса (импеллер)",
+    eq:"Насос забортной воды · система охлаждения",
+    conf:88,
+    impa:"593208", issa:"75.204.08", maker:"Alfa Laval", oem:"IMP-CN-160",
+    equip:"Центробежный насос охлаждения",
+    specs:[["Тип","Закрытое рабочее колесо"],["Ø","160 мм"],["Материал","Бронза CuAl"],["Посадка","Шпонка 12 мм"]],
+    alts:["Бронзовый аналог CuAl10Ni","Импеллер из нерж. стали 316","Ремкомплект: кольца + уплотнения"],
+    suppliers:[
+      {av:"SS",nm:"ShipServ Pages",meta:"B2B-площадка · сравнение цен",price:"$410",d:"6–9 дн",stock:"in",st:"В наличии"},
+      {av:"AL",nm:"Alfa Laval Store",meta:"OEM · заводская гарантия",price:"$520",d:"4–7 дн",stock:"in",st:"В наличии"},
+      {av:"LS",nm:"LocalShipSupply",meta:"Аналог · порт Сингапур",price:"$260",d:"1–2 дн",stock:"low",st:"Мало"},
+    ],
+    repair:{verdict:"repair",big:"Возможен ремонт",
+      why:"Кавитационный износ лопастей умеренный. При наличии сервиса в порту колесо можно восстановить наплавкой и перебалансировать за 1–2 дня — дешевле и быстрее ожидания OEM. Если износ пойдёт дальше — плановая замена на аналог.",
+      buy:"$410",fix:"$150",buyS:"новое OEM, 6–9 дн",fixS:"наплавка, 1–2 дня"}
+  },
+  {
+    emo:"🔥", name:"Пластина теплообменника + прокладка",
+    eq:"Пластинчатый теплообменник · охлаждение масла",
+    conf:82,
+    impa:"594611", issa:"75.401.11", maker:"Alfa Laval", oem:"M10-BFG / gasket",
+    equip:"Пластинчатый теплообменник Alfa Laval M10",
+    specs:[["Тип","Пластина 0.5 мм, титан"],["Прокладка","NBR (нитрил)"],["Рабочая t°","до 110 °C"],["Комплект","1 пластина + 1 прокладка"]],
+    alts:["Прокладка EPDM (для воды)","Комплект прокладок на секцию","Пластина нерж. 316 (аналог)"],
+    suppliers:[
+      {av:"SS",nm:"ShipServ Pages",meta:"B2B-площадка · опт",price:"$95 / шт",d:"8–12 дн",stock:"in",st:"В наличии"},
+      {av:"AL",nm:"Alfa Laval Store",meta:"OEM · комплект прокладок",price:"$1 850 / компл",d:"5–9 дн",stock:"in",st:"В наличии"},
+      {av:"GK",nm:"GasketPro Marine",meta:"Аналог прокладок NBR",price:"$62 / шт",d:"3–5 дн",stock:"in",st:"В наличии"},
+    ],
+    repair:{verdict:"replace",big:"Замена прокладок",
+      why:"Сами титановые пластины целы — течь по контуру масла из-за задубевших прокладок NBR. Ремонт не требуется: достаточно перебрать пакет с новым комплектом прокладок. Пластины менять только при точечной коррозии.",
+      buy:"$1 850",fix:"$0",buyS:"компл. прокладок",fixS:"переборка силами экипажа"}
+  }
+];
+
+const ROLE_CTA = {
+  mech:{cta:"Оформить заявку на снабжение", hint:"Наведите камеру на деталь и её табличку"},
+  owner:{cta:"Добавить в реестр флота", hint:"Учёт и контроль закупок по всему флоту"},
+  yard:{cta:"Добавить в смету ремонта", hint:"Быстрая дефектация и подбор под смету"}
+};
+let role="mech", current=null;
+
+// build samples
+const wrap=document.getElementById('samples');
+PARTS.forEach((p,i)=>{
+  const el=document.createElement('div');
+  el.className='sample';
+  el.innerHTML=`<div class="emo">${p.emo}</div><div><div class="nm">${p.name}</div><div class="ds">${p.eq}</div></div><div class="go">›</div>`;
+  el.onclick=()=>startScan(i);
+  wrap.appendChild(el);
+});
+
+// role switch
+document.querySelectorAll('.role').forEach(r=>{
+  r.onclick=()=>{
+    document.querySelectorAll('.role').forEach(x=>x.classList.remove('active'));
+    r.classList.add('active'); role=r.dataset.role;
+    document.getElementById('roleHint').textContent=ROLE_CTA[role].hint;
+    document.getElementById('mainCta').textContent=ROLE_CTA[role].cta;
+  };
+});
+
+function show(id){['s-capture','s-scan','s-result'].forEach(s=>document.getElementById(s).style.display=(s===id?'block':'none'));}
+
+function startScan(i){
+  current=PARTS[i];
+  document.getElementById('scanPart').textContent=current.emo;
+  show('s-scan');
+  const msgs=["Анализ формы и геометрии…","Чтение шильдика: обнаружен номер…","Сопоставление с каталогом IMPA/ISSA…","Подбор поставщиков и аналогов…"];
+  const steps=document.querySelectorAll('#steps .step');
+  steps.forEach(s=>s.classList.remove('on'));
+  let k=0;
+  document.getElementById('scanmsg').textContent=msgs[0];
+  steps[0].classList.add('on');
+  const t=setInterval(()=>{
+    k++;
+    if(k<msgs.length){ document.getElementById('scanmsg').textContent=msgs[k]; steps[k].classList.add('on'); }
+    else{ clearInterval(t); renderResult(); }
+  },850);
+}
+
+function renderResult(){
+  const p=current;
+  show('s-result');
+  // tabs reset
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelector('.tab[data-tab="report"]').classList.add('active');
+  switchTab('report');
+
+  document.getElementById('rName').textContent=p.name;
+  document.getElementById('rEq').textContent=p.eq;
+  document.getElementById('rImpa').textContent=p.impa;
+  document.getElementById('rIssa').textContent=p.issa;
+  document.getElementById('rMaker').textContent=p.maker;
+  document.getElementById('rOem').textContent=p.oem;
+  document.getElementById('rEquip').textContent=p.equip;
+
+  document.getElementById('rSpecs').innerHTML=p.specs.map(s=>`<div class="kv"><span class="k">${s[0]}</span><span class="v">${s[1]}</span></div>`).join('');
+  document.getElementById('rAlts').innerHTML=p.alts.map(a=>`<div class="alt"><span class="b"></span>${a}</div>`).join('');
+
+  document.getElementById('rSuppliers').innerHTML=p.suppliers.map(s=>`
+    <div class="supplier">
+      <div class="av">${s.av}</div>
+      <div><div class="nm">${s.nm}</div><div class="meta">${s.meta}</div>
+        <span class="stock ${s.stock}">${s.st}</span></div>
+      <div class="price"><div class="p">${s.price}</div><div class="d">⏱ ${s.d}</div></div>
+    </div>`).join('');
+
+  const r=p.repair;
+  document.getElementById('rRepair').innerHTML=`
+    <div class="repair-verdict ${r.verdict}">
+      <div class="lbl">Рекомендация</div>
+      <div class="big">${r.verdict==='repair'?'🛠 ':'♻️ '}${r.big}</div>
+      <div class="why">${r.why}</div>
+    </div>
+    <div class="cmp">
+      <div class="col"><h4>Замена</h4><div class="n">${r.buy}</div><div class="s">${r.buyS}</div></div>
+      <div class="col"><h4>Ремонт</h4><div class="n">${r.fix}</div><div class="s">${r.fixS}</div></div>
+    </div>
+    <div style="font-size:11.5px;color:var(--mut);margin-top:12px;line-height:1.5">
+      Решение носит рекомендательный характер: финальный выбор — за судовым механиком с учётом наличия сервиса в порту и стоимости простоя.
+    </div>`;
+
+  // confidence animate
+  const fill=document.getElementById('confFill'), val=document.getElementById('confVal');
+  fill.style.width='0%';
+  setTimeout(()=>{fill.style.width=p.conf+'%';},60);
+  let c=0; const ct=setInterval(()=>{c+=3;if(c>=p.conf){c=p.conf;clearInterval(ct);}val.textContent=c+'%';},22);
+
+  document.getElementById('mainCta').textContent=ROLE_CTA[role].cta;
+}
+
+function switchTab(name){
+  ['report','buy','fix'].forEach(t=>document.getElementById('tab-'+t).style.display=(t===name?'block':'none'));
+}
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');switchTab(t.dataset.tab);};
+});
+
+function reset(){show('s-capture');}
+</script>
+</body>
+</html>
