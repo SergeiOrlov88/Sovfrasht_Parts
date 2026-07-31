@@ -3,7 +3,6 @@
 секретов в коде нет (NFR-SEC-05)."""
 from functools import lru_cache
 
-from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,18 +36,19 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = 14
 
     # ── CORS ─────────────────────────────────────────────────────────────────
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    # Хранится строкой через запятую, а НЕ list[str]: для сложных типов
+    # pydantic-settings пытается разобрать значение переменной окружения как JSON
+    # ещё до валидаторов и падает на «http://a,http://b». Разбираем сами — см.
+    # cors_origin_list.
+    cors_origins: str = "http://localhost:5173"
 
     # ── Пороги бизнес-логики (задел на шаги 2-3) ─────────────────────────────
     confidence_threshold: int = 70
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def _split_origins(cls, v):
-        """CORS_ORIGINS приходит строкой через запятую."""
-        if isinstance(v, str):
-            return [o.strip() for o in v.split(",") if o.strip()]
-        return v
+    @property
+    def cors_origin_list(self) -> list[str]:
+        """CORS_ORIGINS задаётся строкой через запятую."""
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @property
     def sqlalchemy_dsn(self) -> str:
