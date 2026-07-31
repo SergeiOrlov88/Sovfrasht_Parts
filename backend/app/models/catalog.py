@@ -13,14 +13,18 @@ class Part(Base, UUIDPKMixin, TimestampMixin):
     """Позиция каталога. Хотя бы один идентификатор обязателен (docs/07 §3)."""
     __tablename__ = "parts"
     __table_args__ = (
-        sa.CheckConstraint(
-            "impa_code IS NOT NULL OR issa_code IS NOT NULL OR oem_number IS NOT NULL",
-            name="ck_parts_has_identifier",
-        ),
+        # CHECK «минимум один код» снят на шаге 3: в реальном каталоге часть
+        # позиций (крупные судовые дизели) поставляется без публичных номеров —
+        # такие детали опознаются по name/maker/equipment. docs/07 §3 обновлён.
         sa.Index("ix_parts_impa_code", "impa_code"),
         sa.Index("ix_parts_issa_code", "issa_code"),
         sa.Index("ix_parts_oem_number", "oem_number"),
         sa.Index("ix_parts_category", "category"),
+        sa.Index("ix_parts_maker_norm", "maker_norm"),
+        # Нормализованные коды — рабочие ключи точного матчинга (A3)
+        sa.Index("ix_parts_impa_norm", "impa_code_norm"),
+        sa.Index("ix_parts_issa_norm", "issa_code_norm"),
+        sa.Index("ix_parts_oem_norm", "oem_number_norm"),
     )
 
     impa_code: Mapped[str | None] = mapped_column(sa.String(64))
@@ -32,14 +36,46 @@ class Part(Base, UUIDPKMixin, TimestampMixin):
     specs: Mapped[dict | None] = mapped_column(JSONType)
     equipment: Mapped[str | None] = mapped_column(sa.String(512))  # применимое оборудование
 
+    # Канонические формы кодов: верхний регистр, только A-Z0-9. Заполняются
+    # одинаково при импорте каталога и при поиске по строке из OCR — иначе
+    # «точное совпадение» промахивается на пробелах и дефисах.
+    impa_code_norm: Mapped[str | None] = mapped_column(sa.String(64))
+    issa_code_norm: Mapped[str | None] = mapped_column(sa.String(64))
+    oem_number_norm: Mapped[str | None] = mapped_column(sa.String(128))
+    maker_norm: Mapped[str | None] = mapped_column(sa.String(255))
+
     # ЗАДЕЛ НА ШАГ 3: колонка embedding vector(N) добавляется отдельной миграцией,
     # когда будет выбрана модель эмбеддингов (размерность зависит от неё) — FR-CAT-02.
 
+    aliases: Mapped[list["PartAlias"]] = relationship(
+        back_populates="part", cascade="all, delete-orphan", lazy="selectin"
+    )
     alternatives: Mapped[list["PartAlternative"]] = relationship(
         back_populates="part", foreign_keys="PartAlternative.part_id"
     )
     offers: Mapped[list["SupplierOffer"]] = relationship(back_populates="part")
     repair_info: Mapped["RepairInfo | None"] = relationship(back_populates="part", uselist=False)
+
+
+class PartAlias(Base, UUIDPKMixin, TimestampMixin):
+    """Альтернативное написание номера или наименования детали.
+
+    Поставщики и каталоги пишут один и тот же номер по-разному; алиас ищется
+    точно, наравне с основным номером, — это дешевле и надёжнее нечёткого поиска.
+    """
+    __tablename__ = "part_aliases"
+    __table_args__ = (
+        sa.UniqueConstraint("part_id", "alias_norm", name="uq_part_aliases_part_alias"),
+        sa.Index("ix_part_aliases_alias_norm", "alias_norm"),
+    )
+
+    part_id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid(as_uuid=True), sa.ForeignKey("parts.id", ondelete="CASCADE"), nullable=False
+    )
+    alias: Mapped[str] = mapped_column(sa.String(512), nullable=False)
+    alias_norm: Mapped[str] = mapped_column(sa.String(512), nullable=False)
+
+    part: Mapped["Part"] = relationship(back_populates="aliases")
 
 
 class PartAlternative(Base, UUIDPKMixin, TimestampMixin):

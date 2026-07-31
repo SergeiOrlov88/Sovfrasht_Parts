@@ -21,9 +21,12 @@ from app.adapters.vision.base import OcrResult, PhotoInput, ProviderUnavailable,
 from app.adapters.vision.registry import get_ocr_provider, get_vision_provider
 from app.core.config import settings
 from app.models.enums import ModerationStatus, PhotoKind, RecognitionStatus, ScanStatus
-from app.models.scan import ModerationTask, Photo, Recognition, Scan
+from app.models.scan import (
+    ModerationTask, Photo, Recognition, RecognitionCandidate, Scan,
+)
 from app.models.vision_cache import VisionCache
-from app.services import storage
+from app.services import catalog_service, storage
+from app.services.catalog_service import CatalogStatus
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +39,8 @@ class PipelineOutcome:
     needs_expert: bool
     used_fallback: bool
     cache_hits: int = 0
+    catalog_status: str = CatalogStatus.not_found.value
+    candidates_count: int = 0
 
 
 # ── Кэш платных вызовов (NFR-COST-01) ────────────────────────────────────────
@@ -176,6 +181,17 @@ async def run_pipeline(db: AsyncSession, scan_id: uuid.UUID) -> PipelineOutcome:
         confidence = vision.confidence
         model_version = vision.model_version or vision_provider.name
 
+    # ── Сопоставление с каталогом (A3, FR-CAT-02) ───────────────────────────
+    match = await catalog_service.match(
+        db,
+        oem_number=best.oem_number,
+        maker=best.maker or (vision.maker if vision else None),
+        name_hint=(vision.description if vision else None) or best.text or None,
+        equipment_hint=vision.category if vision else None,
+    )
+    # Матчинг уточняет доверие: код нашёлся — выше, не нашёлся — ниже
+    confidence = catalog_service.adjust_confidence(confidence, match)
+
     # ── Сохранение результата (FR-REC-03, FR-REC-05) ────────────────────────
     recognition = await db.scalar(select(Recognition).where(Recognition.scan_id == scan.id))
     if recognition is None:
@@ -194,7 +210,23 @@ async def run_pipeline(db: AsyncSession, scan_id: uuid.UUID) -> PipelineOutcome:
     recognition.oem_detected = best.oem_number
     recognition.model_version = model_version
     recognition.status = RecognitionStatus.auto.value
-    # part_id остаётся пустым: сопоставление с каталогом — шаг 3 (A3, FR-CAT-02)
+    recognition.detected_tokens = best.raw.get("tokens") if best.raw else None
+    recognition.catalog_status = match.status.value
+    recognition.part_id = match.primary.id if match.primary else None
+
+    # Кандидаты (NFR-ACC-02). Искусственно НЕ добираем: нет совпадений —
+    # отчёт честно скажет «нет в каталоге» (решение заказчика).
+    await db.flush()
+    existing_ids = {c.part_id for c in (await db.scalars(
+        select(RecognitionCandidate)
+        .where(RecognitionCandidate.recognition_id == recognition.id)
+    )).all()}
+    for candidate in match.candidates:
+        if candidate.part.id in existing_ids:
+            continue
+        db.add(RecognitionCandidate(recognition_id=recognition.id, part_id=candidate.part.id,
+                                    relevance=round(candidate.relevance, 4)))
+        existing_ids.add(candidate.part.id)
 
     needs_expert = confidence < settings.confidence_threshold
     scan.status = (ScanStatus.needs_review if needs_expert else ScanStatus.done).value
@@ -210,13 +242,15 @@ async def run_pipeline(db: AsyncSession, scan_id: uuid.UUID) -> PipelineOutcome:
                                   status=ModerationStatus.pending.value))
 
     await db.commit()
-    logger.info("Скан %s: confidence=%d fallback=%s кэш-попаданий=%d -> %s",
-                scan_id, confidence, used_fallback, cache_hits, scan.status)
+    logger.info("Скан %s: confidence=%d fallback=%s каталог=%s кандидатов=%d "
+                "кэш-попаданий=%d -> %s", scan_id, confidence, used_fallback,
+                match.status.value, len(match.candidates), cache_hits, scan.status)
 
     return PipelineOutcome(
         scan_status=ScanStatus(scan.status), confidence=confidence,
         model_version=model_version, needs_expert=needs_expert,
         used_fallback=used_fallback, cache_hits=cache_hits,
+        catalog_status=match.status.value, candidates_count=len(match.candidates),
     )
 
 

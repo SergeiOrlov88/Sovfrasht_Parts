@@ -82,6 +82,14 @@ class Settings(BaseSettings):
     external_max_attempts: int = 3
     external_backoff_seconds: float = 1.5
 
+    # ── Сопоставление с каталогом (A3, FR-CAT-02) ────────────────────────────
+    catalog_top_n: int = 5                # сколько кандидатов возвращаем
+    catalog_trigram_threshold: float = 0.4  # порог similarity для pg_trgm
+    catalog_min_prefix_len: int = 5       # короче — префиксный поиск даёт мусор
+    # Вектор отключён сознательно: на узком каталоге хватает точного матча и
+    # триграмм. Включать только если нечёткий поиск начнёт мазать.
+    catalog_vector_search: bool = False
+
     # ── Контроль стоимости (NFR-COST-01) ─────────────────────────────────────
     vision_cache_enabled: bool = True
     vision_cache_ttl_days: int = 30

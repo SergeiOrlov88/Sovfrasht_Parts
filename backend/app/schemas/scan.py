@@ -52,6 +52,27 @@ class ScanRead(BaseModel):
     photos: list[PhotoRead] = Field(default_factory=list)
 
 
+class PartBrief(BaseModel):
+    """Позиция каталога в отчёте (FR-REP-01)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    maker: str | None = None
+    category: str | None = None
+    impa_code: str | None = None
+    issa_code: str | None = None
+    oem_number: str | None = None
+    equipment: str | None = None
+    specs: dict | None = None
+
+
+class CandidateRead(BaseModel):
+    """Альтернативный кандидат с релевантностью (NFR-ACC-02)."""
+    part: PartBrief
+    relevance: float
+
+
 class RecognitionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -63,6 +84,9 @@ class RecognitionRead(BaseModel):
     oem_detected: str | None = None
     model_version: str | None = None
     status: RecognitionStatus
+    # matched | candidates | not_found — «нет в каталоге» показывается честно,
+    # похожее силой не подбирается (решение заказчика)
+    catalog_status: str | None = None
 
 
 class ScanReport(BaseModel):
@@ -71,6 +95,8 @@ class ScanReport(BaseModel):
     status: ScanStatus
     created_at: datetime
     recognition: RecognitionRead | None = None
+    part: PartBrief | None = None                     # найденная позиция каталога
+    candidates: list[CandidateRead] = Field(default_factory=list)
     photos: list[PhotoRead] = Field(default_factory=list)
     # Ниже порога результат не годится для автоматического оформления заявки
     # (FR-REC-04, NFR-ACC-03)

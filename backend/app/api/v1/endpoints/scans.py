@@ -17,8 +17,11 @@ from app.core.errors import AppError
 from app.core.rbac import get_current_user, require_roles
 from app.models.enums import Role, ScanStatus
 from app.models.org import User, Vessel
-from app.models.scan import Recognition, Scan
+from app.models.catalog import Part
+from app.models.scan import Recognition, RecognitionCandidate, Scan
 from app.schemas.scan import (
+    CandidateRead,
+    PartBrief,
     RecognitionRead,
     ScanAccepted,
     ScanCreateMeta,
@@ -110,6 +113,13 @@ _STATUS_MESSAGE = {
     ScanStatus.error: "Распознавание не удалось. Скан можно отправить на повторную обработку.",
 }
 
+# Пояснение про каталог: «нет в каталоге» говорим прямо, а не подсовываем похожее
+_CATALOG_MESSAGE = {
+    "matched": None,
+    "candidates": "Точного совпадения в каталоге нет — показаны близкие позиции.",
+    "not_found": "Детали нет в каталоге. Коды подобрать не удалось — нужен эксперт.",
+}
+
 
 @router.get("/scans/{scan_id}/report", response_model=ScanReport, summary="Отчёт по скану")
 async def get_report(scan_id: uuid.UUID, user: User = Depends(get_current_user),
@@ -121,14 +131,37 @@ async def get_report(scan_id: uuid.UUID, user: User = Depends(get_current_user),
     below_threshold = bool(
         recognition and (recognition.confidence or 0) < settings.confidence_threshold
     )
+
+    part: Part | None = None
+    candidates: list[CandidateRead] = []
+    if recognition is not None:
+        if recognition.part_id:
+            part = await db.scalar(select(Part).where(Part.id == recognition.part_id))
+        rows = (await db.execute(
+            select(RecognitionCandidate, Part)
+            .join(Part, Part.id == RecognitionCandidate.part_id)
+            .where(RecognitionCandidate.recognition_id == recognition.id)
+            .order_by(RecognitionCandidate.relevance.desc())
+        )).all()
+        candidates = [
+            CandidateRead(part=PartBrief.model_validate(p), relevance=c.relevance or 0.0)
+            for c, p in rows
+        ]
+
+    message = _STATUS_MESSAGE.get(scan_status)
+    if recognition is not None:
+        message = _CATALOG_MESSAGE.get(recognition.catalog_status or "", message) or message
+
     return ScanReport(
         scan_id=scan.id,
         status=scan_status,
         created_at=scan.created_at,
         recognition=RecognitionRead.model_validate(recognition) if recognition else None,
+        part=PartBrief.model_validate(part) if part else None,
+        candidates=candidates,
         photos=await scan_service.with_signed_urls(scan.photos),
         needs_expert=scan_status is ScanStatus.needs_review or below_threshold,
-        message=_STATUS_MESSAGE.get(scan_status),
+        message=message,
     )
 
 

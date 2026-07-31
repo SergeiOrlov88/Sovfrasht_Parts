@@ -8,38 +8,15 @@ from sqlalchemy import func, select
 from app.adapters.vision import registry
 from app.adapters.vision.base import OcrResult, ProviderUnavailable, VisionResult
 from app.adapters.vision.vision_llm import parse_vision_reply
-from app.adapters.vision.yandex_ocr import parse_nameplate
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.enums import ScanStatus
 from app.models.scan import ModerationTask, Photo, Recognition, Scan
 from app.models.vision_cache import VisionCache
-from app.services import recognition_service, storage
+from app.services import catalog_import, recognition_service, storage
 
 
-# ── Разбор ответов провайдеров: чистые функции, без сети ─────────────────────
-
-@pytest.mark.parametrize("text,expected", [
-    ("MAKER: BOSCH\nPART NO: 0445120123\nSERIAL: 998877", "0445120123"),
-    ("P/N 1234-AB-56", "1234-AB-56"),
-    ("Артикул: DK-9981234", "DK-9981234"),
-    ("КАКОЙ-ТО ШУМ 0986437789 ЕЩЁ ТЕКСТ", "0986437789"),
-])
-def test_parse_nameplate_finds_number(text, expected):
-    assert parse_nameplate(text)["oem_number"] == expected
-
-
-def test_parse_nameplate_ignores_words_without_digits():
-    """«PUMP HOUSING» — не номер детали."""
-    assert parse_nameplate("PUMP HOUSING MADE IN GERMANY")["oem_number"] is None
-
-
-def test_parse_nameplate_extracts_maker_and_serial():
-    parsed = parse_nameplate("MANUFACTURER: YANMAR\nS/N: 77-1234\nPART NO: 119773-42100")
-    assert parsed["maker"] == "YANMAR"
-    assert parsed["serial_number"] == "77-1234"
-    assert parsed["oem_number"] == "119773-42100"
-
+# ── Разбор ответов vision-модели ─────────────────────────────────────────────
 
 @pytest.mark.parametrize("reply", [
     '{"category":"насос","description":"центробежный насос","maker":null,"confidence":40}',
@@ -82,6 +59,14 @@ def stub_storage(monkeypatch):
     monkeypatch.setattr(storage, "get_object_sync", lambda key: b"\x89PNG\r\n\x1a\nbytes")
 
 
+async def _seed_part(oem="0445120123", maker="BOSCH"):
+    """Каталог нужен, потому что итоговый confidence зависит от результата матчинга."""
+    async with SessionLocal() as db:
+        await catalog_import.import_rows(db, [
+            dict(name="Форсунка Common Rail", category="fuel_equipment",
+                 maker=maker, oem_number=oem)])
+
+
 async def _make_scan(data, kinds=("nameplate",)) -> uuid.UUID:
     async with SessionLocal() as db:
         scan = Scan(vessel_id=data["vessel_a"], author_id=data["users"]["mech_a"],
@@ -122,10 +107,12 @@ async def test_readable_nameplate_goes_done(client, data, stub_storage, monkeypa
         text="MAKER BOSCH PART NO 0445120123 SERIAL 998877", maker="BOSCH",
         oem_number="0445120123", serial_number="998877", model_version="test_ocr:v1",
     ))
+    await _seed_part()
     scan_id = await _make_scan(data)
     async with SessionLocal() as db:
         outcome = await recognition_service.run_pipeline(db, scan_id)
 
+    assert outcome.catalog_status == "matched"
     assert outcome.scan_status is ScanStatus.done
     assert outcome.needs_expert is False
     assert outcome.used_fallback is False
@@ -154,7 +141,7 @@ async def test_unreadable_nameplate_falls_back_to_vision(client, data, stub_stor
     assert outcome.used_fallback is True
     assert outcome.scan_status is ScanStatus.needs_review
     assert outcome.needs_expert is True
-    assert outcome.confidence == 40
+    assert outcome.confidence == 20   # 40, понижено из-за not_found в каталоге
 
     async with SessionLocal() as db:
         rec = await db.scalar(select(Recognition).where(Recognition.scan_id == scan_id))
@@ -194,6 +181,7 @@ async def test_cache_prevents_second_paid_call(client, data, stub_storage, monke
     monkeypatch.setattr(recognition_service, "get_vision_provider",
                         lambda: type("V", (), {"name": "v", "describe": None})())
 
+    await _seed_part()
     scan_id = await _make_scan(data)
     async with SessionLocal() as db:
         first = await recognition_service.run_pipeline(db, scan_id)

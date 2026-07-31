@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.base import TZDateTime, TimestampMixin, UUIDPKMixin
+from app.models.base import JSONType, TZDateTime, TimestampMixin, UUIDPKMixin
 
 
 class Scan(Base, UUIDPKMixin, TimestampMixin):
@@ -94,6 +94,11 @@ class Recognition(Base, UUIDPKMixin, TimestampMixin):
     oem_detected: Mapped[str | None] = mapped_column(sa.String(255))
     model_version: Mapped[str | None] = mapped_column(sa.String(128))
     status: Mapped[str] = mapped_column(sa.String(32), nullable=False, default="auto")
+    # Все номероподобные токены с шильдика и то, какой из них выбран и почему.
+    # Сырьё для калибровки эвристики по реальным фото (FR-REC-05).
+    detected_tokens: Mapped[list | None] = mapped_column(JSONType)
+    # Итог сопоставления с каталогом: matched | candidates | not_found
+    catalog_status: Mapped[str | None] = mapped_column(sa.String(16))
 
     scan: Mapped["Scan"] = relationship(back_populates="recognition")
     candidates: Mapped[list["RecognitionCandidate"]] = relationship(

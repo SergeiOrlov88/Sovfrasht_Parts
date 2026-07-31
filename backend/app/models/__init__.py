@@ -2,6 +2,7 @@
 """Реэкспорт моделей: важно, чтобы Alembic видел все таблицы в Base.metadata."""
 from app.models.catalog import (
     Part,
+    PartAlias,
     PartAlternative,
     RepairInfo,
     Supplier,
@@ -22,6 +23,6 @@ from app.models.vision_cache import VisionCache
 __all__ = [
     "Organization", "Vessel", "User", "user_vessels",
     "Scan", "Photo", "Recognition", "RecognitionCandidate",
-    "Part", "PartAlternative", "Supplier", "SupplierOffer", "RepairInfo",
+    "Part", "PartAlias", "PartAlternative", "Supplier", "SupplierOffer", "RepairInfo",
     "PartRequest", "ModerationTask", "TrainingSample", "VisionCache",
 ]
