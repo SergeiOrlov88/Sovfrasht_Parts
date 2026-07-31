@@ -1,0 +1,77 @@
+# Локальный запуск: postgres + redis + api + worker.
+# Порты наружу намеренно нестандартные — на сервере рядом живут «Факт Прочности»
+# и «Пирометрика», конфликтовать по портам нельзя (NFR-DEPLOY-01).
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16          # pg16 + расширение vector (задел на шаг 3, FR-CAT-02)
+    container_name: sovfrasht_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5434}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: sovfrasht_redis
+    ports:
+      - "${REDIS_HOST_PORT:-6381}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .                            # контекст — корень репозитория: в образ нужны и backend, и worker
+      dockerfile: backend/Dockerfile
+    container_name: sovfrasht_api
+    command: >
+      sh -c "alembic -c /srv/backend/alembic.ini upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /srv/backend"
+    env_file: .env
+    ports:
+      - "${API_HOST_PORT:-8010}:8000"
+    volumes:
+      - ./backend:/srv/backend              # правки кода без пересборки образа
+      - ./worker:/srv/worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile        # тот же образ, что и api — общий доменный код, без дублирования
+    container_name: sovfrasht_worker
+    command: celery -A worker.celery_app worker --loglevel=info --concurrency=2
+    env_file: .env
+    volumes:
+      - ./backend:/srv/backend
+      - ./worker:/srv/worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started          # миграции накатывает api — worker стартует после него
+    restart: unless-stopped
+
+volumes:
+  pgdata:
