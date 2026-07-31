@@ -16,7 +16,8 @@ RBAC: каждый эндпоинт проверяет роль и принад�
 
 ## 2. Аутентификация (AUTH)
 
-`POST /auth/login` — вход. Body: `{ "login", "password" }` → `{ "access_token", "refresh_token", "user": {...} }`. (FR-AUTH-01)
+`POST /auth/token` — вход. Body: `{ "login", "password" }` → `{ "access_token", "refresh_token", "user": {...} }`. (FR-AUTH-01)
+*(Имя `/auth/token` выбрано для единообразия с существующими приложениями компании — «Факт Прочности» — и как идиоматичное имя token-эндпоинта в OAuth2/FastAPI.)*
 
 `POST /auth/refresh` — обновление токена. Body: `{ "refresh_token" }` → новый `access_token`.
 
