@@ -17,10 +17,11 @@ from app.models.scan import (
     Scan,
     TrainingSample,
 )
+from app.models.vision_cache import VisionCache
 
 __all__ = [
     "Organization", "Vessel", "User", "user_vessels",
     "Scan", "Photo", "Recognition", "RecognitionCandidate",
     "Part", "PartAlternative", "Supplier", "SupplierOffer", "RepairInfo",
-    "PartRequest", "ModerationTask", "TrainingSample",
+    "PartRequest", "ModerationTask", "TrainingSample", "VisionCache",
 ]

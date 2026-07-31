@@ -61,6 +61,11 @@ class Photo(Base, UUIDPKMixin, TimestampMixin):
     kind: Mapped[str] = mapped_column(sa.String(32), nullable=False)
     width: Mapped[int | None] = mapped_column(sa.Integer)
     height: Mapped[int | None] = mapped_column(sa.Integer)
+    mime_type: Mapped[str | None] = mapped_column(sa.String(128))
+    size_bytes: Mapped[int | None] = mapped_column(sa.Integer)
+    # Хеш содержимого: ключ кэша распознавания и защита от повторной оплаты
+    # одного и того же изображения (NFR-COST-01)
+    content_sha256: Mapped[str | None] = mapped_column(sa.String(64), index=True)
 
     scan: Mapped["Scan"] = relationship(back_populates="photos")
 

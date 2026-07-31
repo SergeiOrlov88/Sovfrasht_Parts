@@ -42,8 +42,63 @@ class Settings(BaseSettings):
     # cors_origin_list.
     cors_origins: str = "http://localhost:5173"
 
-    # ── Пороги бизнес-логики (задел на шаги 2-3) ─────────────────────────────
+    # ── Пороги бизнес-логики ─────────────────────────────────────────────────
+    # Ниже порога заявка автоматически не оформляется, скан уходит эксперту
+    # (FR-REC-04, NFR-ACC-03).
     confidence_threshold: int = 70
+    # Потолок доверия к fallback-ветке: шильдик не прочитан, опознан только тип
+    # детали — такой результат обязан попасть на проверку человеку.
+    vision_fallback_max_confidence: int = 55
+
+    # ── Хранилище фото: MinIO / S3-совместимое (NFR-SEC-04) ──────────────────
+    s3_endpoint_url: str = "http://minio:9000"
+    s3_public_endpoint_url: str = ""      # адрес для подписанных ссылок наружу
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
+    s3_bucket: str = "scans"
+    s3_region: str = "us-east-1"
+    s3_presign_ttl_seconds: int = 900     # 15 минут — ссылка не должна жить вечно
+
+    # ── Загрузка фото (NFR-SEC-04) ───────────────────────────────────────────
+    max_photos_per_scan: int = 3          # FR-CAP-01
+    max_photo_size_mb: int = 12
+    allowed_photo_mime: str = "image/jpeg,image/png,image/heic,image/heif,image/webp"
+
+    # ── Распознавание: провайдеры за адаптером (docs/06) ─────────────────────
+    # Основной путь — OCR шильдика; fallback — облачная vision-модель.
+    ocr_provider: str = "yandex"          # yandex | stub
+    vision_provider: str = "stub"         # llm | stub  (stub = выключено, конвейер деградирует мягко)
+
+    yandex_ocr_url: str = "https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText"
+    yandex_api_key: str = ""
+    yandex_folder_id: str = ""
+
+    vision_llm_url: str = ""
+    vision_llm_api_key: str = ""
+    vision_llm_model: str = ""
+
+    # ── Надёжность внешних вызовов (NFR-REL-03) ──────────────────────────────
+    external_timeout_seconds: float = 20.0
+    external_max_attempts: int = 3
+    external_backoff_seconds: float = 1.5
+
+    # ── Контроль стоимости (NFR-COST-01) ─────────────────────────────────────
+    vision_cache_enabled: bool = True
+    vision_cache_ttl_days: int = 30
+    max_image_side_px: int = 2000         # ужимаем перед отправкой — платим за меньший объём
+
+    @property
+    def allowed_photo_mime_set(self) -> set[str]:
+        return {m.strip().lower() for m in self.allowed_photo_mime.split(",") if m.strip()}
+
+    @property
+    def max_photo_size_bytes(self) -> int:
+        return self.max_photo_size_mb * 1024 * 1024
+
+    @property
+    def s3_presign_endpoint(self) -> str:
+        """Внутри compose api ходит в minio:9000, а браузеру нужен внешний адрес."""
+        return self.s3_public_endpoint_url or self.s3_endpoint_url
 
     @property
     def cors_origin_list(self) -> list[str]:

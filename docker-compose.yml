@@ -33,6 +33,25 @@ services:
       retries: 10
     restart: unless-stopped
 
+  minio:
+    image: minio/minio:latest               # S3-совместимое хранилище фото (NFR-SEC-04)
+    container_name: sovfrasht_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    ports:
+      - "${MINIO_HOST_PORT:-9010}:9000"     # S3 API — сюда ведут подписанные ссылки
+      - "${MINIO_CONSOLE_PORT:-9011}:9001"  # веб-консоль
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
   api:
     build:
       context: .                            # контекст — корень репозитория: в образ нужны и backend, и worker
@@ -52,6 +71,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     restart: unless-stopped
 
   worker:
@@ -69,9 +90,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_healthy
       api:
         condition: service_started          # миграции накатывает api — worker стартует после него
     restart: unless-stopped
 
 volumes:
   pgdata:
+  miniodata:

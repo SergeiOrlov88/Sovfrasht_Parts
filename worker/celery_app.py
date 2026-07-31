@@ -13,7 +13,7 @@ celery_app = Celery(
     "sovfrasht_parts",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["worker.tasks.health"],
+    include=["worker.tasks.health", "worker.tasks.recognition"],
 )
 
 celery_app.conf.update(
