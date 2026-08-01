@@ -5,7 +5,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import RequestPriority, RequestStatus, StockStatus, SupplierType
+from app.models.enums import (
+    RepairVerdict,
+    RequestPriority,
+    RequestStatus,
+    StockStatus,
+    SupplierType,
+)
 from app.schemas.scan import PartBrief
 
 
@@ -84,3 +90,29 @@ class PartRequestPage(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# ── Ремонт или замена (D1) ───────────────────────────────────────────────────
+
+class RepairEstimate(BaseModel):
+    """Сравнение «замена vs ремонт». Цена замены — из лучшего предложения
+    поставщика, ремонт — доля от неё по отраслевому правилу."""
+    replace_price: str | None = None
+    replace_lead_time: str | None = None
+    replace_supplier: str | None = None
+    repair_cost_estimate: str | None = None
+    repair_share: str | None = None
+    repair_time: str | None = None
+
+
+class RepairAdvice(BaseModel):
+    """Рекомендация «ремонт или замена» (FR-REPAIR-01/02)."""
+    part: PartBrief
+    verdict: RepairVerdict
+    rationale: str | None = None
+    rule_subtype: str | None = None
+    estimate: RepairEstimate = Field(default_factory=RepairEstimate)
+    # Восстановленная деталь — отдельный путь между ремонтом и новой заменой
+    reman_offers: list[OfferRead] = Field(default_factory=list)
+    # Обязателен всегда, вне зависимости от вердикта (FR-REPAIR-02)
+    disclaimer: str

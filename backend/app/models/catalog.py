@@ -160,7 +160,8 @@ class RepairInfo(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "repair_infos"
     __table_args__ = (
         sa.UniqueConstraint("part_id", name="uq_repair_infos_part"),
-        sa.CheckConstraint("verdict IN ('repair','replace')", name="ck_repair_infos_verdict"),
+        sa.CheckConstraint("verdict IN ('repair','replace','unknown')",
+                           name="ck_repair_infos_verdict"),
     )
 
     part_id: Mapped[uuid.UUID] = mapped_column(
@@ -171,5 +172,11 @@ class RepairInfo(Base, UUIDPKMixin, TimestampMixin):
     repair_cost_estimate: Mapped[str | None] = mapped_column(sa.String(64))
     replace_cost_estimate: Mapped[str | None] = mapped_column(sa.String(64))
     repair_time: Mapped[str | None] = mapped_column(sa.String(64))
+    # Доля стоимости ремонта от новой детали, как в отраслевом правиле («50–60%»).
+    # Строка, а не число: правило задаёт диапазон, а не точную величину.
+    repair_share: Mapped[str | None] = mapped_column(sa.String(32))
+    # Тип детали (specs.subtype), по которому применилось правило, — чтобы было
+    # видно, откуда взялась рекомендация, и можно было пересобрать при смене правил
+    rule_subtype: Mapped[str | None] = mapped_column(sa.String(64))
 
     part: Mapped["Part"] = relationship(back_populates="repair_info")

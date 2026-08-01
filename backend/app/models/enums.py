@@ -70,6 +70,9 @@ class StockStatus(str, enum.Enum):
 class RepairVerdict(str, enum.Enum):
     repair = "repair"
     replace = "replace"
+    # Правила для этого типа детали нет — честнее сказать «не знаем»,
+    # чем выдать отраслевую эвристику за рекомендацию (FR-REPAIR-01)
+    unknown = "unknown"
 
 
 class RequestPriority(str, enum.Enum):

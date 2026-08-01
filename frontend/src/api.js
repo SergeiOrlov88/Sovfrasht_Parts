@@ -71,3 +71,5 @@ export const createPartRequest = (payload) =>
   request('/part-requests', { method: 'POST', body: payload })
 
 export const listPartRequests = (params = '') => request(`/part-requests${params}`)
+
+export const getRepair = (partId) => request(`/parts/${partId}/repair`)

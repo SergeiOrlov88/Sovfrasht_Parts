@@ -1,13 +1,14 @@
 // Экран отчёта по скану (B1, FR-REP-01..04). Три вкладки как в прототипе:
-// «Отчёт» работает, «Закупка» и «Ремонт» — заглушки до шагов 5 и 6.
+// «Отчёт» (B1), «Закупка» (C1/C2) и «Ремонт» (D1).
 import { useEffect, useState } from 'react'
 import { getReport, sendFeedback } from './api'
 import Purchase from './Purchase.jsx'
+import Repair from './Repair.jsx'
 
 const TABS = [
   { key: 'report', label: 'Отчёт' },
   { key: 'purchase', label: 'Закупка' },
-  { key: 'repair', label: 'Ремонт', stub: 'Появится на шаге 6: ремонт или замена.' },
+  { key: 'repair', label: 'Ремонт' },
 ]
 
 const LEVEL_COLOR = { high: 'var(--ok)', medium: 'var(--warn)', low: 'var(--bad)' }
@@ -78,11 +79,7 @@ export default function Report({ scanId, onBack }) {
 
       {tab === 'purchase' && <Purchase report={data} />}
 
-      {tab === 'repair' && (
-        <div className="card stub">
-          <p className="muted">{TABS.find(t => t.key === tab).stub}</p>
-        </div>
-      )}
+      {tab === 'repair' && <Repair report={data} />}
 
       {tab === 'report' && (
         <>

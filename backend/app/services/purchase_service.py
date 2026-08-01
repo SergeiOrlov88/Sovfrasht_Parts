@@ -157,9 +157,13 @@ async def list_requests(db: AsyncSession, user: User, *, status: str | None,
     base = (select(PartRequest)
             .join(Vessel, Vessel.id == PartRequest.vessel_id)
             .where(Vessel.organization_id == user.organization_id))
-    # Механик видит только свои заявки; снабженец и руководство — все по организации
+    # Механик видит заявки СВОИХ СУДОВ (не только заведённые лично): на борту
+    # заявку мог оформить сменщик, и она всё равно про это судно (FR-PRO-06).
+    # Снабженец и руководство видят все заявки организации.
     if user.role == "mechanic":
-        base = base.where(PartRequest.author_id == user.id)
+        vessel_ids = [v.id for v in user.vessels]
+        base = base.where(PartRequest.vessel_id.in_(vessel_ids) if vessel_ids
+                          else PartRequest.vessel_id.is_(None))
     if status:
         base = base.where(PartRequest.status == status)
     if vessel_id:

@@ -131,3 +131,9 @@ input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 select { min-height:48px; padding:0 12px; border-radius:9px; border:1px solid var(--border);
          background:#0b1220; color:var(--text); font-size:16px; }
 a.btn.small { display:inline-flex; align-items:center; text-decoration:none; }
+
+.rationale { margin:8px 0 0; font-size:14px; line-height:1.5; }
+.compare { display:flex; gap:10px; margin-top:6px; }
+.opt { flex:1; padding:12px; border-radius:9px; background:#0b1220; border:1px solid var(--border); }
+.opt-title { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+.opt-value { font-size:19px; font-weight:600; margin:4px 0 2px; }

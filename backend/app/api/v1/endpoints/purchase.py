@@ -17,11 +17,13 @@ from app.core.database import get_db
 from app.core.errors import AppError
 from app.core.rbac import get_current_user, require_roles
 from app.models.catalog import Part
-from app.models.enums import RequestStatus, Role
+from app.models.enums import RepairVerdict, RequestStatus, Role
 from app.models.org import User, Vessel
 from app.models.scan import PartRequest
 from app.schemas.purchase import (
     OfferRead,
+    RepairAdvice,
+    RepairEstimate,
     PartOffers,
     PartRequestCreate,
     PartRequestPage,
@@ -31,7 +33,7 @@ from app.schemas.purchase import (
     AlternativeOffers,
 )
 from app.schemas.scan import PartBrief
-from app.services import purchase_service
+from app.services import purchase_service, repair_service
 
 router = APIRouter(tags=["purchase"])
 
@@ -168,6 +170,60 @@ async def _get_for_user(db: AsyncSession, user: User, request_id: uuid.UUID) -> 
     vessel = await db.scalar(select(Vessel).where(Vessel.id == request.vessel_id))
     if vessel is None or vessel.organization_id != user.organization_id:
         raise AppError(404, "not_found", "Заявка не найдена")
-    if user.role == Role.mechanic.value and request.author_id != user.id:
+    # Механику доступны заявки его судов, а не только заведённые им лично (FR-PRO-06)
+    if user.role == Role.mechanic.value and request.vessel_id not in {v.id for v in user.vessels}:
         raise AppError(404, "not_found", "Заявка не найдена")
     return request
+
+
+@router.get("/parts/{part_id}/repair", response_model=RepairAdvice,
+            summary="Рекомендация «ремонт или замена»")
+async def get_repair_advice(
+    part_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> RepairAdvice:
+    """Рекомендация по ремонтопригодности (FR-REPAIR-01).
+
+    Правило — отраслевая эвристика по типу детали, а не оценка конкретного
+    экземпляра, поэтому дисклеймер обязателен при любом вердикте (FR-REPAIR-02).
+    """
+    part = await db.scalar(select(Part).where(Part.id == part_id))
+    if part is None:
+        raise AppError(404, "not_found", "Деталь не найдена в каталоге")
+
+    info = await repair_service.get_repair_info(db, part.id)
+
+    # Цену замены берём из лучшего предложения: провайдер уже отсортировал
+    # «сначала в наличии, потом дешевле»
+    estimate = RepairEstimate()
+    reman: list = []
+    try:
+        offers = await purchase_service.offers_for_part(db, part)
+    except SupplierUnavailable:
+        offers = []                      # без цен рекомендация всё равно осмысленна
+
+    new_offers = [o for o in offers if o.supplier.type != "reman"]
+    reman = [o for o in offers if o.supplier.type == "reman"]
+    if new_offers:
+        best = new_offers[0]
+        estimate.replace_price = best.price
+        estimate.replace_lead_time = best.lead_time
+        estimate.replace_supplier = best.supplier.name
+
+    if info is not None:
+        estimate.repair_share = info.repair_share
+        estimate.repair_time = info.repair_time
+        estimate.repair_cost_estimate = repair_service.estimate_repair_cost(
+            estimate.replace_price, info.repair_share)
+
+    return RepairAdvice(
+        part=PartBrief.model_validate(part),
+        verdict=RepairVerdict(info.verdict) if info else RepairVerdict.unknown,
+        rationale=info.rationale if info else
+        "Данных о ремонтопригодности этой детали пока нет.",
+        rule_subtype=info.rule_subtype if info else (part.specs or {}).get("subtype"),
+        estimate=estimate,
+        reman_offers=[_to_offer(o) for o in reman],
+        disclaimer=repair_service.DISCLAIMER,
+    )
