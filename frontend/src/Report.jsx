@@ -2,10 +2,11 @@
 // «Отчёт» работает, «Закупка» и «Ремонт» — заглушки до шагов 5 и 6.
 import { useEffect, useState } from 'react'
 import { getReport, sendFeedback } from './api'
+import Purchase from './Purchase.jsx'
 
 const TABS = [
   { key: 'report', label: 'Отчёт' },
-  { key: 'purchase', label: 'Закупка', stub: 'Появится на шаге 5: поставщики и заявка.' },
+  { key: 'purchase', label: 'Закупка' },
   { key: 'repair', label: 'Ремонт', stub: 'Появится на шаге 6: ремонт или замена.' },
 ]
 
@@ -75,7 +76,9 @@ export default function Report({ scanId, onBack }) {
         ))}
       </div>
 
-      {tab !== 'report' && (
+      {tab === 'purchase' && <Purchase report={data} />}
+
+      {tab === 'repair' && (
         <div className="card stub">
           <p className="muted">{TABS.find(t => t.key === tab).stub}</p>
         </div>

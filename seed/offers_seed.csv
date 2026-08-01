@@ -1,0 +1,12 @@
+part_oem,supplier_name,supplier_type,supplier_region,supplier_url,price,lead_time,stock_status,deep_link
+0445120100,ShipServ Pages,площадка,глобально,https://impa-catalogue.shipserv.com/,$1 190,7–10 дн,in,https://impa-catalogue.shipserv.com/
+0445120100,Marine Parts Direct,дистрибьютор,Роттердам,https://example-marineparts.demo,$1 340,3–5 дн,in,https://example-marineparts.demo/p/0445120100
+0445120100,ReMarine (reman),восстановление,ЕС,https://example-remarine.demo,$690,5–8 дн,low,https://example-remarine.demo/p/0445120100
+51101006127,ShipServ Pages,площадка,глобально,https://impa-catalogue.shipserv.com/,$1 260,7–12 дн,in,https://impa-catalogue.shipserv.com/
+51101006127,MAN PrimeServ,OEM,глобально,https://example-man.demo,$1 520,4–6 дн,in,https://example-man.demo/p/51101006127
+095000-5650,ShipServ Pages,площадка,глобально,https://impa-catalogue.shipserv.com/,$540,6–9 дн,in,https://impa-catalogue.shipserv.com/
+095000-5650,Sealand Turbo-Diesel,дистрибьютор,Сингапур,https://example-sealand.demo,$480,2–4 дн,low,https://example-sealand.demo/p/095000-5650
+719575-53100,Yanmar Marine,OEM,глобально,https://example-yanmar.demo,$610,5–7 дн,in,https://example-yanmar.demo/p/719575-53100
+719575-53100,ShipServ Pages,площадка,глобально,https://impa-catalogue.shipserv.com/,$650,8–11 дн,in,https://impa-catalogue.shipserv.com/
+148821,Wärtsilä Spare Parts,OEM,глобально,https://example-wartsila.demo,$1 240,7–10 дн,in,https://example-wartsila.demo/p/148821
+148821,ShipMachineryParts,дистрибьютор,глобально,https://example-smp.demo,$980,10–14 дн,low,https://example-smp.demo/p/148821

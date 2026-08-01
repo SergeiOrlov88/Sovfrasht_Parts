@@ -82,6 +82,13 @@ class Settings(BaseSettings):
     external_max_attempts: int = 3
     external_backoff_seconds: float = 1.5
 
+    # ── Поставщики и закупка (C1/C2, ADR-05) ─────────────────────────────────
+    # curated — курируемый список в БД. Позже здесь появится api-провайдер
+    # конкретного производителя; ядро при этом не меняется (FR-PRO-05).
+    supplier_provider: str = "curated"
+    # Пометка источника при заливке демо-предложений: их видно отдельно от API
+    offers_default_source: str = "demo"
+
     # ── Сопоставление с каталогом (A3, FR-CAT-02) ────────────────────────────
     catalog_top_n: int = 5                # сколько кандидатов возвращаем
     catalog_trigram_threshold: float = 0.4  # порог similarity для pg_trgm

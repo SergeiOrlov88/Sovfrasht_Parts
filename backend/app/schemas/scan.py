@@ -97,8 +97,10 @@ class RecognitionRead(BaseModel):
 
 
 class ScanReport(BaseModel):
-    """Отчёт по скану. Сопоставление с каталогом и кандидаты — шаг 3 (A3)."""
+    """Полный отчёт по скану (B1, FR-REP-01..03)."""
     scan_id: uuid.UUID
+    # Нужен вкладке «Закупка»: заявка оформляется на конкретное судно
+    vessel_id: uuid.UUID
     status: ScanStatus
     created_at: datetime
     recognition: RecognitionRead | None = None

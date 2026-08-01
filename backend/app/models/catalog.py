@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """Каталог: деталь, аналоги, поставщики, предложения, ремонтопригодность (docs/07)."""
 import uuid
+from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.base import JSONType, TimestampMixin, UUIDPKMixin
+from app.models.base import JSONType, TZDateTime, TimestampMixin, UUIDPKMixin
 
 
 class Part(Base, UUIDPKMixin, TimestampMixin):
@@ -112,7 +113,7 @@ class Supplier(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "suppliers"
     __table_args__ = (
         sa.CheckConstraint(
-            "type IN ('marketplace','supplier','oem')", name="ck_suppliers_type"
+            "type IN ('marketplace','supplier','oem','reman')", name="ck_suppliers_type"
         ),
     )
 
@@ -129,6 +130,8 @@ class SupplierOffer(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "supplier_offers"
     __table_args__ = (
         sa.CheckConstraint("stock_status IN ('in','low','out')", name="ck_supplier_offers_stock"),
+        sa.CheckConstraint("source IN ('curated','demo','api')", name="ck_supplier_offers_source"),
+        sa.UniqueConstraint("part_id", "supplier_id", name="uq_supplier_offers_part_supplier"),
         sa.Index("ix_supplier_offers_part_id", "part_id"),
         sa.Index("ix_supplier_offers_supplier_id", "supplier_id"),
     )
@@ -143,6 +146,10 @@ class SupplierOffer(Base, UUIDPKMixin, TimestampMixin):
     lead_time: Mapped[str | None] = mapped_column(sa.String(128))
     stock_status: Mapped[str | None] = mapped_column(sa.String(16))
     deep_link: Mapped[str | None] = mapped_column(sa.String(2048))
+    # Откуда предложение: курируемый список / демо-данные / внешний API.
+    # Нужен, чтобы отличать демонстрационные цены от полученных по API (ADR-05).
+    source: Mapped[str] = mapped_column(sa.String(16), nullable=False, default="curated")
+    fetched_at: Mapped[datetime | None] = mapped_column(TZDateTime)
 
     part: Mapped["Part"] = relationship(back_populates="offers")
     supplier: Mapped["Supplier"] = relationship(back_populates="offers")

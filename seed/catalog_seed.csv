@@ -1,5 +1,6 @@
 name,category,maker,impa_code,issa_code,oem_number,equipment,specs,aliases,alt_oem
-Форсунка Common Rail Bosch (инжектор),fuel_equipment,Bosch,,,0445120100,Дизель Common Rail (в т.ч. MAN),"{""subtype"": ""cr_injector"", ""num_status"": ""verified""}",CRIN;инжектор common rail,MAN 51101006127
+Форсунка Common Rail Bosch (инжектор),fuel_equipment,Bosch,,,0445120100,Дизель Common Rail (в т.ч. MAN),"{""subtype"": ""cr_injector"", ""num_status"": ""verified""}",CRIN;инжектор common rail,51101006127
+Форсунка Common Rail MAN (инжектор),fuel_equipment,MAN,,,51101006127,MAN дизель (Common Rail),"{""subtype"": ""cr_injector"", ""num_status"": ""verified""}",CRIN;инжектор MAN,0445120100
 Форсунка Common Rail Bosch (инжектор),fuel_equipment,Bosch,,,0445120208,Дизель Common Rail,"{""subtype"": ""cr_injector"", ""num_status"": ""verified""}",CRIN,
 Форсунка Common Rail Bosch (инжектор),fuel_equipment,Bosch,,,0445120177,Дизель Common Rail,"{""subtype"": ""cr_injector"", ""num_status"": ""verified""}",CRIN,
 Форсунка Common Rail Bosch (инжектор),fuel_equipment,Bosch,,,0445120027,Дизель Common Rail,"{""subtype"": ""cr_injector"", ""num_status"": ""verified""}",CRIN,

@@ -127,3 +127,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .thumbs { display:flex; gap:8px; flex-wrap:wrap; }
 .thumbs img { width:88px; height:88px; object-fit:cover; border-radius:8px; border:1px solid var(--border); }
 .stub { min-height:120px; display:flex; align-items:center; justify-content:center; }
+
+select { min-height:48px; padding:0 12px; border-radius:9px; border:1px solid var(--border);
+         background:#0b1220; color:var(--text); font-size:16px; }
+a.btn.small { display:inline-flex; align-items:center; text-decoration:none; }

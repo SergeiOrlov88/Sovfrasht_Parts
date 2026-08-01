@@ -64,3 +64,10 @@ export const sendFeedback = (scanId, { verdict, correct_part_id, comment }) =>
     method: 'POST',
     body: { verdict, correct_part_id: correct_part_id ?? null, comment: comment ?? null },
   })
+
+export const getOffers = (partId) => request(`/parts/${partId}/offers`)
+
+export const createPartRequest = (payload) =>
+  request('/part-requests', { method: 'POST', body: payload })
+
+export const listPartRequests = (params = '') => request(`/part-requests${params}`)

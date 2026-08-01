@@ -47,9 +47,18 @@ class CompatibilityType(str, enum.Enum):
 
 
 class SupplierType(str, enum.Enum):
-    marketplace = "marketplace"
-    supplier = "supplier"
-    oem = "oem"
+    marketplace = "marketplace"   # площадка (ShipServ и т.п.)
+    supplier = "supplier"         # дистрибьютор
+    oem = "oem"                   # производитель
+    reman = "reman"               # восстановление/ремануфактуринг
+
+
+class OfferSource(str, enum.Enum):
+    """Откуда получено предложение. Пока всё curated; ADR-05 в docs/06 описывает,
+    как рядом встанет api-провайдер конкретного производителя."""
+    curated = "curated"           # курируемый список, заведён вручную
+    demo = "demo"                 # демонстрационные данные пилота
+    api = "api"                   # получено из внешнего API поставщика
 
 
 class StockStatus(str, enum.Enum):

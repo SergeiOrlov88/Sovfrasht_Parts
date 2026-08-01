@@ -170,6 +170,7 @@ async def get_report(scan_id: uuid.UUID, user: User = Depends(get_current_user),
 
     return ScanReport(
         scan_id=scan.id,
+        vessel_id=scan.vessel_id,
         status=scan_status,
         created_at=scan.created_at,
         recognition=RecognitionRead.model_validate(recognition) if recognition else None,
