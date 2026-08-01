@@ -57,11 +57,22 @@ async def test_import_accepts_part_without_codes(client, data):
     assert report.created == 1 and report.skipped == 0
 
 
-async def test_import_warns_when_neither_code_nor_maker(client, data):
-    """Без кодов И без производителя сопоставлять будет нечем — предупреждаем."""
+async def test_import_rejects_unidentifiable_row(client, data):
+    """Мягкий инвариант (docs/07 §3): без производителя И без оборудования
+    позицию нечем опознать — такую строку не принимаем."""
     async with SessionLocal() as db:
         report = await catalog_import.import_rows(db, [dict(name="Деталь ниоткуда")])
-    assert any("сопоставить будет нечем" in w for w in report.warnings)
+    assert report.skipped == 1
+    assert "нечем опознать" in report.errors[0]
+
+
+async def test_import_accepts_row_with_equipment_only(client, data):
+    """Производителя нет, но есть оборудование — этого достаточно."""
+    async with SessionLocal() as db:
+        report = await catalog_import.import_rows(db, [
+            dict(name="Плунжерная пара", equipment="Wärtsilä 6L32")])
+    assert report.created == 1
+    assert any("сопоставление пойдёт только по оборудованию" in w for w in report.warnings)
 
 
 async def test_match_codeless_part_by_maker_and_equipment(client, data):
@@ -77,21 +88,21 @@ async def test_match_codeless_part_by_maker_and_equipment(client, data):
 
 async def test_import_rejects_row_without_name(client, data):
     async with SessionLocal() as db:
-        report = await catalog_import.import_rows(db, [dict(oem_number="123456")])
+        report = await catalog_import.import_rows(db, [dict(maker="BOSCH", oem_number="123456")])
     assert report.skipped == 1 and "name" in report.errors[0]
 
 
 async def test_import_warns_on_unknown_category(client, data):
     async with SessionLocal() as db:
         report = await catalog_import.import_rows(db, [
-            dict(name="Деталь", category="космос", oem_number="123456")])
+            dict(name="Деталь", category="космос", maker="BOSCH", oem_number="123456")])
     assert any("незнакомая категория" in w for w in report.warnings)
 
 
 async def test_import_dry_run_writes_nothing(client, data):
     async with SessionLocal() as db:
         report = await catalog_import.import_rows(
-            db, [dict(name="Форсунка", oem_number="0445120123")], dry_run=True)
+            db, [dict(name="Форсунка", maker="BOSCH", oem_number="0445120123")], dry_run=True)
     assert report.created == 1
     async with SessionLocal() as db:
         assert await db.scalar(catalog_service.select(Part)) is None
@@ -113,7 +124,7 @@ async def test_import_links_alternatives_second_pass(client, data):
 async def test_import_warns_when_alternative_missing(client, data):
     async with SessionLocal() as db:
         report = await catalog_import.import_rows(db, [
-            dict(name="Форсунка", oem_number="0445120123", alt_oem="НЕТ-ТАКОГО"),
+            dict(name="Форсунка", maker="BOSCH", oem_number="0445120123", alt_oem="НЕТ-ТАКОГО"),
         ])
     assert any("не найден в каталоге" in w for w in report.warnings)
 
@@ -121,7 +132,7 @@ async def test_import_warns_when_alternative_missing(client, data):
 async def test_import_bad_specs_json_warns_but_loads(client, data):
     async with SessionLocal() as db:
         report = await catalog_import.import_rows(db, [
-            dict(name="Форсунка", oem_number="0445120123", specs="{это не json"),
+            dict(name="Форсунка", maker="BOSCH", oem_number="0445120123", specs="{это не json"),
         ])
     assert report.created == 1
     assert any("specs" in w for w in report.warnings)

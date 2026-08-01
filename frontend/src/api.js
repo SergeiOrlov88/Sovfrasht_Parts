@@ -56,3 +56,11 @@ export const me = () => request('/auth/me')
 
 export const refreshAccess = () =>
   request('/auth/refresh', { method: 'POST', body: { refresh_token: tokens.refresh }, auth: false })
+
+export const getReport = (scanId) => request(`/scans/${scanId}/report`)
+
+export const sendFeedback = (scanId, { verdict, correct_part_id, comment }) =>
+  request(`/scans/${scanId}/feedback`, {
+    method: 'POST',
+    body: { verdict, correct_part_id: correct_part_id ?? null, comment: comment ?? null },
+  })

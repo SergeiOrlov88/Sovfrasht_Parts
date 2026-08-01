@@ -13,9 +13,14 @@ class Part(Base, UUIDPKMixin, TimestampMixin):
     """Позиция каталога. Хотя бы один идентификатор обязателен (docs/07 §3)."""
     __tablename__ = "parts"
     __table_args__ = (
-        # CHECK «минимум один код» снят на шаге 3: в реальном каталоге часть
-        # позиций (крупные судовые дизели) поставляется без публичных номеров —
-        # такие детали опознаются по name/maker/equipment. docs/07 §3 обновлён.
+        # Жёсткое «минимум один код» снято на шаге 3: часть позиций (крупные
+        # судовые дизели) поставляется без публичных номеров. Взамен — мягкий
+        # инвариант: у позиции есть название И хотя бы производитель или
+        # применимое оборудование, иначе её нечем опознать (docs/07 §3).
+        sa.CheckConstraint(
+            "name IS NOT NULL AND (maker IS NOT NULL OR equipment IS NOT NULL)",
+            name="ck_parts_identifiable",
+        ),
         sa.Index("ix_parts_impa_code", "impa_code"),
         sa.Index("ix_parts_issa_code", "issa_code"),
         sa.Index("ix_parts_oem_number", "oem_number"),

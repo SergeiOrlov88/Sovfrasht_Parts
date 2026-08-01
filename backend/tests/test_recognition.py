@@ -64,7 +64,7 @@ async def _seed_part(oem="0445120123", maker="BOSCH"):
     async with SessionLocal() as db:
         await catalog_import.import_rows(db, [
             dict(name="Форсунка Common Rail", category="fuel_equipment",
-                 maker=maker, oem_number=oem)])
+                 maker=maker, oem_number=oem, equipment="Дизель CR")])
 
 
 async def _make_scan(data, kinds=("nameplate",)) -> uuid.UUID:

@@ -67,6 +67,13 @@ class PartBrief(BaseModel):
     specs: dict | None = None
 
 
+class AlternativeRead(BaseModel):
+    """Аналог/заменитель детали (FR-REP-03, FR-CAT-04)."""
+    part: "PartBrief"
+    compatibility: str          # full | partial | kit
+    note: str | None = None
+
+
 class CandidateRead(BaseModel):
     """Альтернативный кандидат с релевантностью (NFR-ACC-02)."""
     part: PartBrief
@@ -97,8 +104,42 @@ class ScanReport(BaseModel):
     recognition: RecognitionRead | None = None
     part: PartBrief | None = None                     # найденная позиция каталога
     candidates: list[CandidateRead] = Field(default_factory=list)
+    alternatives: list[AlternativeRead] = Field(default_factory=list)   # FR-REP-03
     photos: list[PhotoRead] = Field(default_factory=list)
     # Ниже порога результат не годится для автоматического оформления заявки
     # (FR-REC-04, NFR-ACC-03)
     needs_expert: bool = False
+    # Индикатор достоверности и предупреждение (FR-REP-02)
+    confidence: int | None = None
+    confidence_level: str | None = None               # high | medium | low
+    warning: str | None = None
+    # Доступные пользователю действия по отчёту
+    can_confirm: bool = False
+    can_request_expert: bool = False
+    feedback: "FeedbackState | None" = None
     message: str | None = None
+
+
+class FeedbackState(BaseModel):
+    """Что пользователь уже ответил по этому отчёту (FR-REP-04)."""
+    verdict: str                                      # confirm | reject
+    corrected_part_id: uuid.UUID | None = None
+    at: datetime
+
+
+class FeedbackRequest(BaseModel):
+    """Подтверждение или отклонение результата (FR-REP-04, B3)."""
+    verdict: str = Field(pattern="^(confirm|reject)$")
+    # При отклонении можно сразу указать правильную деталь
+    correct_part_id: uuid.UUID | None = None
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+class FeedbackResponse(BaseModel):
+    scan_id: uuid.UUID
+    recognition_status: RecognitionStatus
+    verdict: str
+    part: PartBrief | None = None
+    training_sample_created: bool = False
+    moderation_task_created: bool = False
+    message: str

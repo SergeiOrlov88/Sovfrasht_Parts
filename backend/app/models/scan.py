@@ -79,6 +79,10 @@ class Recognition(Base, UUIDPKMixin, TimestampMixin):
         sa.CheckConstraint(
             "status IN ('auto','confirmed','corrected','rejected')", name="ck_recognitions_status"
         ),
+        sa.CheckConstraint(
+            "feedback_verdict IS NULL OR feedback_verdict IN ('confirm','reject')",
+            name="ck_recognitions_feedback_verdict",
+        ),
         sa.Index("ix_recognitions_part_id", "part_id"),
     )
 
@@ -99,6 +103,14 @@ class Recognition(Base, UUIDPKMixin, TimestampMixin):
     detected_tokens: Mapped[list | None] = mapped_column(JSONType)
     # Итог сопоставления с каталогом: matched | candidates | not_found
     catalog_status: Mapped[str | None] = mapped_column(sa.String(16))
+
+    # Обратная связь пользователя по отчёту (FR-REP-04, B3)
+    feedback_verdict: Mapped[str | None] = mapped_column(sa.String(16))
+    feedback_by: Mapped[uuid.UUID | None] = mapped_column(
+        sa.Uuid(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL")
+    )
+    feedback_at: Mapped[datetime | None] = mapped_column(TZDateTime)
+    feedback_comment: Mapped[str | None] = mapped_column(sa.Text)
 
     scan: Mapped["Scan"] = relationship(back_populates="recognition")
     candidates: Mapped[list["RecognitionCandidate"]] = relationship(

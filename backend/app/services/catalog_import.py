@@ -152,11 +152,21 @@ async def import_rows(db: AsyncSession, rows: list[dict], dry_run: bool = False)
             report.skipped += 1
             continue
         # Позиция без кодов — норма: у ряда судовых дизелей номера непубличны,
-        # опознание идёт по name/maker/equipment. Но без производителя такую
-        # деталь потом не отличить от однофамильцев — предупреждаем.
-        if not any(codes) and not (row.get("maker") or "").strip():
+        # опознание идёт по name/maker/equipment. Но совсем неопознаваемую строку
+        # (без производителя И без оборудования) не принимаем — инвариант БД.
+        maker_raw = (row.get("maker") or "").strip()
+        equipment_raw = (row.get("equipment") or "").strip()
+        if not maker_raw and not equipment_raw:
+            report.errors.append(
+                f"строка {index} ({name}): нужен производитель или применимое оборудование — "
+                f"иначе позицию нечем опознать"
+            )
+            report.skipped += 1
+            continue
+        if not any(codes) and not maker_raw:
             report.warnings.append(
-                f"строка {index} ({name}): ни кодов, ни производителя — сопоставить будет нечем"
+                f"строка {index} ({name}): кодов нет, производитель не указан — "
+                f"сопоставление пойдёт только по оборудованию"
             )
         category = (row.get("category") or "").strip() or None
         if category and category not in KNOWN_CATEGORIES:

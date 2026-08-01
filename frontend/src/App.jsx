@@ -2,6 +2,7 @@
 // Остальные экраны (съёмка, отчёт, заявка) — следующие шаги по docs/09.
 import { useEffect, useState } from 'react'
 import { login as apiLogin, me as apiMe, tokens } from './api'
+import Report from './Report.jsx'
 
 const ROLE_LABELS = {
   mechanic: 'Механик',
@@ -17,6 +18,8 @@ export default function App() {
   const [form, setForm] = useState({ login: '', password: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [scanId, setScanId] = useState('')      // какой отчёт открыт
+  const [scanInput, setScanInput] = useState('')
 
   // При загрузке — если токен уже лежит, проверяем его через /auth/me
   useEffect(() => {
@@ -53,6 +56,14 @@ export default function App() {
 
   if (checking) return <main className="wrap"><p className="muted">Загрузка…</p></main>
 
+  if (user && scanId) {
+    return (
+      <main className="wrap">
+        <Report scanId={scanId} onBack={() => setScanId('')} />
+      </main>
+    )
+  }
+
   if (user) {
     return (
       <main className="wrap">
@@ -66,7 +77,15 @@ export default function App() {
             <dt>Суда</dt>
             <dd>{user.vessels?.length ? user.vessels.map(v => v.name).join(', ') : '—'}</dd>
           </dl>
-          <button className="btn" onClick={onLogout}>Выйти</button>
+
+          {/* Съёмка и реестр сканов — следующие шаги; пока открываем отчёт по id */}
+          <label htmlFor="scan">Открыть отчёт по скану</label>
+          <input id="scan" value={scanInput} placeholder="id скана"
+            onChange={e => setScanInput(e.target.value)} autoComplete="off" />
+          <button className="btn" disabled={!scanInput.trim()}
+            onClick={() => setScanId(scanInput.trim())}>Открыть отчёт</button>
+
+          <button className="btn ghost" onClick={onLogout}>Выйти</button>
         </section>
       </main>
     )

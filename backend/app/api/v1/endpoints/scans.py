@@ -18,9 +18,13 @@ from app.core.rbac import get_current_user, require_roles
 from app.models.enums import Role, ScanStatus
 from app.models.org import User, Vessel
 from app.models.catalog import Part
-from app.models.scan import Recognition, RecognitionCandidate, Scan
+from app.models.scan import Recognition, Scan
 from app.schemas.scan import (
+    AlternativeRead,
     CandidateRead,
+    FeedbackRequest,
+    FeedbackResponse,
+    FeedbackState,
     PartBrief,
     RecognitionRead,
     ScanAccepted,
@@ -28,7 +32,7 @@ from app.schemas.scan import (
     ScanRead,
     ScanReport,
 )
-from app.services import scan_service
+from app.services import report_service, scan_service
 
 router = APIRouter(tags=["scans"])
 
@@ -134,23 +138,35 @@ async def get_report(scan_id: uuid.UUID, user: User = Depends(get_current_user),
 
     part: Part | None = None
     candidates: list[CandidateRead] = []
+    alternatives: list[AlternativeRead] = []
+    feedback: FeedbackState | None = None
+
     if recognition is not None:
         if recognition.part_id:
             part = await db.scalar(select(Part).where(Part.id == recognition.part_id))
-        rows = (await db.execute(
-            select(RecognitionCandidate, Part)
-            .join(Part, Part.id == RecognitionCandidate.part_id)
-            .where(RecognitionCandidate.recognition_id == recognition.id)
-            .order_by(RecognitionCandidate.relevance.desc())
-        )).all()
         candidates = [
             CandidateRead(part=PartBrief.model_validate(p), relevance=c.relevance or 0.0)
-            for c, p in rows
+            for c, p in await report_service.candidate_parts(db, recognition.id)
         ]
+        # Аналоги/заменители найденной позиции (FR-REP-03)
+        alternatives = [
+            AlternativeRead(part=PartBrief.model_validate(alt_part),
+                            compatibility=compatibility, note=note)
+            for alt_part, compatibility, note in
+            await report_service.load_alternatives(db, recognition.part_id)
+        ]
+        if recognition.feedback_verdict and recognition.feedback_at:
+            feedback = FeedbackState(verdict=recognition.feedback_verdict,
+                                     corrected_part_id=recognition.part_id,
+                                     at=recognition.feedback_at)
 
     message = _STATUS_MESSAGE.get(scan_status)
     if recognition is not None:
         message = _CATALOG_MESSAGE.get(recognition.catalog_status or "", message) or message
+
+    confidence = recognition.confidence if recognition else None
+    needs_expert = scan_status is ScanStatus.needs_review or below_threshold
+    ready = recognition is not None and scan_status in {ScanStatus.done, ScanStatus.needs_review}
 
     return ScanReport(
         scan_id=scan.id,
@@ -159,9 +175,52 @@ async def get_report(scan_id: uuid.UUID, user: User = Depends(get_current_user),
         recognition=RecognitionRead.model_validate(recognition) if recognition else None,
         part=PartBrief.model_validate(part) if part else None,
         candidates=candidates,
+        alternatives=alternatives,
         photos=await scan_service.with_signed_urls(scan.photos),
-        needs_expert=scan_status is ScanStatus.needs_review or below_threshold,
+        needs_expert=needs_expert,
+        confidence=confidence,
+        confidence_level=report_service.confidence_level(confidence) if recognition else None,
+        warning=report_service.build_warning(
+            confidence, recognition.catalog_status if recognition else None
+        ) if recognition else None,
+        # Подтверждать имеет смысл только когда есть что подтверждать
+        can_confirm=bool(ready and (part or candidates) and feedback is None),
+        can_request_expert=bool(ready and feedback is None),
+        feedback=feedback,
         message=message,
+    )
+
+
+@router.post("/scans/{scan_id}/feedback", response_model=FeedbackResponse,
+             summary="Подтвердить или исправить результат распознавания")
+async def submit_feedback(
+    scan_id: uuid.UUID,
+    payload: FeedbackRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> FeedbackResponse:
+    """Обратная связь по отчёту (FR-REP-04, B3).
+
+    Подтверждение и исправление пополняют датасет TrainingSample (FR-REC-06);
+    отклонение без указания верной детали создаёт задачу эксперту (F1).
+    """
+    scan = await _get_scan_for_user(db, user, scan_id)
+    result = await report_service.submit_feedback(
+        db, scan, user.id, payload.verdict, payload.correct_part_id, payload.comment
+    )
+    recognition = result["recognition"]
+    part = result["part"]
+    if part is None and recognition.part_id:
+        part = await db.scalar(select(Part).where(Part.id == recognition.part_id))
+
+    return FeedbackResponse(
+        scan_id=scan.id,
+        recognition_status=recognition.status,
+        verdict=payload.verdict,
+        part=PartBrief.model_validate(part) if part else None,
+        training_sample_created=result["training_sample_created"],
+        moderation_task_created=result["moderation_task_created"],
+        message=result["message"],
     )
 
 
