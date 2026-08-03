@@ -73,3 +73,20 @@ export const createPartRequest = (payload) =>
 export const listPartRequests = (params = '') => request(`/part-requests${params}`)
 
 export const getRepair = (partId) => request(`/parts/${partId}/repair`)
+
+// ── Панель эксперта (F2) ─────────────────────────────────────────────────────
+export const listTasks = (status = 'pending') =>
+  request(`/moderation/tasks?status=${status}`)
+
+export const claimTask = (taskId) =>
+  request(`/moderation/tasks/${taskId}/claim`, { method: 'POST' })
+
+export const resolveTask = (taskId, { resolution, correct_part_id }) =>
+  request(`/moderation/tasks/${taskId}/resolve`, {
+    method: 'POST',
+    body: { resolution, correct_part_id: correct_part_id ?? null },
+  })
+
+// ── Уведомления ──────────────────────────────────────────────────────────────
+export const listNotifications = () => request('/notifications')
+export const readNotification = (id) => request(`/notifications/${id}/read`, { method: 'POST' })

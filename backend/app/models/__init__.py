@@ -18,11 +18,12 @@ from app.models.scan import (
     Scan,
     TrainingSample,
 )
+from app.models.notification import Notification
 from app.models.vision_cache import VisionCache
 
 __all__ = [
     "Organization", "Vessel", "User", "user_vessels",
     "Scan", "Photo", "Recognition", "RecognitionCandidate",
     "Part", "PartAlias", "PartAlternative", "Supplier", "SupplierOffer", "RepairInfo",
-    "PartRequest", "ModerationTask", "TrainingSample", "VisionCache",
+    "PartRequest", "ModerationTask", "TrainingSample", "VisionCache", "Notification",
 ]

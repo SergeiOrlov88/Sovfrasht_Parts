@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { login as apiLogin, me as apiMe, tokens } from './api'
 import Report from './Report.jsx'
+import ExpertQueue from './ExpertQueue.jsx'
+import Notifications from './Notifications.jsx'
 
 const ROLE_LABELS = {
   mechanic: 'Механик',
@@ -20,6 +22,7 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [scanId, setScanId] = useState('')      // какой отчёт открыт
   const [scanInput, setScanInput] = useState('')
+  const [screen, setScreen] = useState('home')   // home | expert
 
   // При загрузке — если токен уже лежит, проверяем его через /auth/me
   useEffect(() => {
@@ -56,6 +59,18 @@ export default function App() {
 
   if (checking) return <main className="wrap"><p className="muted">Загрузка…</p></main>
 
+  // Роль-гейт: панель эксперта — экран того же приложения, а не отдельное
+  // приложение. Права всё равно проверяет сервер (NFR-SEC-03).
+  const canModerate = user && ['expert', 'admin'].includes(user.role)
+
+  if (user && screen === 'expert' && canModerate) {
+    return (
+      <main className="wrap">
+        <ExpertQueue onBack={() => setScreen('home')} />
+      </main>
+    )
+  }
+
   if (user && scanId) {
     return (
       <main className="wrap">
@@ -84,6 +99,14 @@ export default function App() {
             onChange={e => setScanInput(e.target.value)} autoComplete="off" />
           <button className="btn" disabled={!scanInput.trim()}
             onClick={() => setScanId(scanInput.trim())}>Открыть отчёт</button>
+
+          {canModerate && (
+            <button className="btn ghost" onClick={() => setScreen('expert')}>
+              Очередь эксперта
+            </button>
+          )}
+
+          <Notifications onOpenScan={id => setScanId(id)} />
 
           <button className="btn ghost" onClick={onLogout}>Выйти</button>
         </section>

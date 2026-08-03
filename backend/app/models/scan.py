@@ -196,6 +196,9 @@ class ModerationTask(Base, UUIDPKMixin, TimestampMixin):
     )
     status: Mapped[str] = mapped_column(sa.String(16), nullable=False, default="pending")
     resolution: Mapped[str | None] = mapped_column(sa.String(16))
+    # Момент взятия в работу: вместе с created_at и resolved_at даёт SLA —
+    # сколько задача ждала очереди и сколько заняло само решение (FR-HITL-04)
+    claimed_at: Mapped[datetime | None] = mapped_column(TZDateTime)
     corrected_part_id: Mapped[uuid.UUID | None] = mapped_column(
         sa.Uuid(as_uuid=True), sa.ForeignKey("parts.id", ondelete="SET NULL")
     )
