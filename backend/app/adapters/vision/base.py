@@ -43,13 +43,38 @@ class OcrResult:
 
 @dataclass(slots=True)
 class VisionResult:
-    """Результат визуальной категоризации (fallback-ветка)."""
+    """Результат визуальной категоризации.
+
+    Исторически — fallback-ветка (шильдик не прочитался). С появлением сильной
+    vision-модели те же поля описывают и ОСНОВНОЙ путь опознания, поэтому ниже
+    добавлены необязательные поля развёрнутой идентификации. Старые провайдеры
+    их просто не заполняют — контракт обратно совместим.
+    """
     description: str = ""
     category: str | None = None
     maker: str | None = None
     model_version: str = ""
     confidence: int = 0
     raw: dict = field(default_factory=dict)
+
+    # ── Развёрнутое опознание (vision-first) ─────────────────────────────────
+    # Отвечает на главный вопрос пользователя «что это за деталь» даже тогда,
+    # когда позиции нет в каталоге.
+    part_type: str | None = None      # что это: тип узла/детали
+    model: str | None = None          # модель/серия, если читается
+    function: str | None = None       # назначение: зачем эта деталь на судне
+    markings: str | None = None       # номера и маркировка с корпуса/шильдика
+    notes: str | None = None          # оговорки: что мешает уверенному ответу
+
+    @property
+    def title(self) -> str:
+        """Человекочитаемое имя детали для отчёта.
+
+        Собираем из того, что модель реально извлекла: производитель + модель +
+        тип. Пустые части пропускаем, чтобы не было «None None».
+        """
+        parts = [p for p in (self.maker, self.model, self.part_type) if p]
+        return " ".join(parts).strip() or (self.description or "").strip()
 
 
 class ProviderUnavailable(RuntimeError):

@@ -42,9 +42,19 @@ def confidence_level(confidence: int | None) -> str:
     return "low"
 
 
-def build_warning(confidence: int | None, catalog_status: str | None) -> str | None:
-    """Предупреждение под индикатором достоверности (FR-REP-02)."""
+def build_warning(confidence: int | None, catalog_status: str | None,
+                  identified: bool = False) -> str | None:
+    """Предупреждение под индикатором достоверности (FR-REP-02).
+
+    identified — деталь опознана vision-моделью. Тогда «нет в каталоге» перестаёт
+    быть провалом: ответ по существу есть, не хватает лишь кодов для закупки.
+    Прежняя формулировка в таком отчёте противоречила бы сама себе.
+    """
     if catalog_status == "not_found":
+        if identified:
+            return ("Кодов для закупки нет: детали нет в каталоге. "
+                    "Заявку по этому результату оформить нельзя — "
+                    "эксперт подтвердит деталь и заведёт её в каталог.")
         return ("Детали нет в каталоге — коды подобрать не удалось. "
                 "Оформлять заявку по этому результату нельзя, отправьте эксперту.")
     if confidence is None or confidence < settings.confidence_threshold:
@@ -54,6 +64,27 @@ def build_warning(confidence: int | None, catalog_status: str | None) -> str | N
     if catalog_status == "candidates":
         return "Точного совпадения нет — проверьте, верно ли выбрана позиция из списка."
     return None
+
+
+def extract_identification(recognition) -> dict | None:
+    """Достаёт опознание vision-модели из detected_tokens.
+
+    Столбец задуман как сырьё (FR-REC-05), поэтому в нём лежит либо старый
+    список токенов OCR, либо словарь режима vision_first. Разбираем аккуратно:
+    у старых сканов формат другой, и отчёт по ним не должен падать.
+    """
+    if recognition is None:
+        return None
+    payload = recognition.detected_tokens
+    if not isinstance(payload, dict):
+        return None
+    ident = payload.get("identification")
+    if not isinstance(ident, dict):
+        return None
+    # Пустое опознание показывать незачем — это тот же «не определена»
+    if not any(ident.get(k) for k in ("title", "part_type", "maker", "model", "function")):
+        return None
+    return ident
 
 
 async def load_alternatives(db: AsyncSession, part_id: uuid.UUID | None) -> list[tuple[Part, str, str | None]]:

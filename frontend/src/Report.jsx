@@ -62,7 +62,9 @@ export default function Report({ scanId, onBack }) {
   if (error && !data) return <p className="error">{error}</p>
   if (!data) return <p className="muted">Загружаем отчёт…</p>
 
-  const { part, candidates, alternatives, recognition } = data
+  // identification — что определила vision-модель. Приходит и тогда, когда
+  // каталожной позиции нет: именно оно отвечает «что это за деталь».
+  const { part, candidates, alternatives, recognition, identification: ident } = data
   const level = data.confidence_level || 'low'
 
   return (
@@ -99,12 +101,30 @@ export default function Report({ scanId, onBack }) {
             {error && <p className="error">{error}</p>}
           </div>
 
-          {/* Позиция каталога (FR-REP-01) */}
+          {/* Что это за деталь (FR-REC-01).
+              Главный вопрос механика. Отвечаем на него ДО каталога: позиции в
+              справочнике может не быть, но знать, что в руках, нужно всегда.
+              Заголовок берём из каталога, если он есть, иначе — из опознания. */}
           <div className="card">
-            <h2>{part ? part.name : 'Деталь не определена'}</h2>
-            {part ? (
+            <h2>{part ? part.name : (ident?.title || 'Деталь не определена')}</h2>
+
+            {ident && (
               <dl className="props">
-                <Field label="Производитель" value={part.maker} />
+                <Field label="Тип детали" value={ident.part_type} />
+                <Field label="Производитель" value={ident.maker} />
+                <Field label="Модель" value={ident.model} />
+                <Field label="Назначение" value={ident.function} />
+                <Field label="Прочитано с детали" value={ident.markings} />
+              </dl>
+            )}
+
+            {ident?.notes && (
+              <p className="muted small">Оговорка модели: {ident.notes}</p>
+            )}
+
+            {/* Каталожные коды — только если позиция найдена */}
+            {part && (
+              <dl className="props">
                 <Field label="Оборудование" value={part.equipment} />
                 <Field label="IMPA" value={part.impa_code} />
                 <Field label="ISSA" value={part.issa_code} />
@@ -114,7 +134,10 @@ export default function Report({ scanId, onBack }) {
                   <Field key={k} label={k} value={String(v)} />
                 ))}
               </dl>
-            ) : (
+            )}
+
+            {/* Каталога нет, но и опознания нет — только тогда прежний текст */}
+            {!part && !ident && (
               <p className="muted">
                 {recognition?.oem_detected
                   ? `С шильдика считан номер ${recognition.oem_detected}, но в каталоге его нет.`
@@ -122,6 +145,27 @@ export default function Report({ scanId, onBack }) {
               </p>
             )}
           </div>
+
+          {/* Деталь опознана, но кодов для закупки нет. Отдельная плашка, чтобы
+              пользователь не принял содержательный отчёт за неудачу (FR-CAT-04). */}
+          {!part && ident && (
+            <div className="card">
+              <p className="warn-box" style={{ marginTop: 0 }}>
+                В каталоге закупки этой детали нет — коды и поставщиков подобрать
+                не удалось. Опознание выше сделано по фотографиям.
+              </p>
+              <div className="actions">
+                {data.can_request_expert && (
+                  <button className="btn" disabled={busy}
+                    onClick={() => feedback('reject')}>Отправить эксперту</button>
+                )}
+              </div>
+              <p className="muted small">
+                Эксперт подтвердит деталь и заведёт её в каталог — после этого
+                появятся коды, поставщики и оценка ремонта.
+              </p>
+            </div>
+          )}
 
           {/* Кандидаты (NFR-ACC-02) */}
           {candidates.length > 0 && (

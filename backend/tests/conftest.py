@@ -14,6 +14,17 @@ os.environ["APP_ENV"] = "test"
 os.environ["ACCESS_TOKEN_TTL_MINUTES"] = "30"
 os.environ["REFRESH_TOKEN_TTL_DAYS"] = "14"
 
+# Режим распознавания в тестах закрепляем явно.
+# Прод по умолчанию работает в vision_first (ADR-06), но существующие тесты
+# описывают ПРЕЖНИЙ контракт ocr_first, и он остаётся поддерживаемым — значит
+# должен быть покрыт. Поведение vision_first проверяется отдельно, там режим
+# включается точечно (test_recognition_vision_first.py).
+os.environ["RECOGNITION_MODE"] = "ocr_first"
+# Ни один тест не должен ходить в платный внешний API: провайдеры подменяются
+# заглушками, а без ключа реестр и сам вернёт заглушку.
+os.environ["VISION_PROVIDER"] = "stub"
+os.environ["OPENROUTER_API_KEY"] = ""
+
 import httpx  # noqa: E402
 from httpx import ASGITransport  # noqa: E402
 

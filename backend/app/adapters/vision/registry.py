@@ -45,6 +45,13 @@ def get_ocr_provider() -> OcrProvider:
 
 
 def get_vision_provider() -> VisionProvider:
+    if settings.vision_provider == "openrouter":
+        if not settings.openrouter_api_key:
+            # Ключа нет — не ходим в сеть и не роняем скан (NFR-REL-03)
+            logger.warning("VISION_PROVIDER=openrouter, но OPENROUTER_API_KEY пуст — заглушка")
+            return StubVisionProvider()
+        from app.adapters.vision.openrouter_vision import OpenRouterVisionProvider
+        return OpenRouterVisionProvider()
     if settings.vision_provider == "llm":
         if not (settings.vision_llm_url and settings.vision_llm_api_key):
             logger.warning("VISION_PROVIDER=llm, но URL/ключ не заданы — заглушка")

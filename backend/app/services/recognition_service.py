@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.adapters.vision.base import OcrResult, PhotoInput, ProviderUnavailable, VisionResult
+from app.adapters.vision.nameplate import parse_nameplate
 from app.adapters.vision.registry import get_ocr_provider, get_vision_provider
 from app.core.config import settings
 from app.models.enums import ModerationStatus, PhotoKind, RecognitionStatus, ScanStatus
@@ -134,6 +135,9 @@ async def run_pipeline(db: AsyncSession, scan_id: uuid.UUID) -> PipelineOutcome:
     ocr_photos, all_photos = _pick_photos(scan.photos)
     ocr_provider = get_ocr_provider()
     cache_hits = 0
+    # Спайк: сильная vision-модель как основной определитель. Каталог при этом
+    # становится обогащением, а не приговором «не найдено» (см. config).
+    vision_first = settings.recognition_mode == "vision_first"
 
     # ── Ветка 1: OCR шильдика (приоритет по FR-REC-02) ──────────────────────
     best = OcrResult()
@@ -161,7 +165,10 @@ async def run_pipeline(db: AsyncSession, scan_id: uuid.UUID) -> PipelineOutcome:
     model_version = best.model_version or ocr_provider.name
 
     # ── Ветка 2: fallback, если шильдик не прочитался ───────────────────────
-    if not best.is_readable:
+    # В режиме vision_first модель зовём ВСЕГДА: она и есть основной ответ на
+    # вопрос «что это за деталь». OCR выше при этом не пропадает — его номер
+    # используется для обогащения каталогом.
+    if vision_first or not best.is_readable:
         vision_provider = get_vision_provider()
         inputs = [await _load(p) for p in all_photos]
         combined_sha = storage.sha256_of("".join(sorted(i.sha256 for i in inputs)).encode())
@@ -176,21 +183,43 @@ async def run_pipeline(db: AsyncSession, scan_id: uuid.UUID) -> PipelineOutcome:
                 "description": vision.description, "category": vision.category,
                 "maker": vision.maker, "model_version": vision.model_version,
                 "confidence": vision.confidence,
+                # развёрнутое опознание (vision-first) — иначе кэш обесценивает ответ
+                "part_type": vision.part_type, "model": vision.model,
+                "function": vision.function, "markings": vision.markings,
+                "notes": vision.notes,
             })
+        # used_fallback означает «ответ дала vision-модель, а не номер с шильдика».
+        # В vision_first это штатный путь, а не деградация.
         used_fallback = True
-        confidence = vision.confidence
+        # Потолок разный: основной путь заслуживает большего доверия, чем
+        # аварийный (см. config, NFR-ACC-03).
+        cap = (settings.vision_primary_max_confidence if vision_first
+               else settings.vision_fallback_max_confidence)
+        confidence = max(0, min(vision.confidence, cap))
         model_version = vision.model_version or vision_provider.name
 
     # ── Сопоставление с каталогом (A3, FR-CAT-02) ───────────────────────────
+    # В vision_first номер ищем и в том, что прочитала vision-модель: OCR мог
+    # промахнуться по шильдику, а модель его разобрала.
+    oem_hint = best.oem_number
+    if vision_first and not oem_hint and vision and vision.markings:
+        # Тот же разбор, что и для OCR-текста: чистая функция, без сети
+        oem_hint = parse_nameplate(vision.markings).oem_number
     match = await catalog_service.match(
         db,
-        oem_number=best.oem_number,
+        oem_number=oem_hint,
         maker=best.maker or (vision.maker if vision else None),
         name_hint=(vision.description if vision else None) or best.text or None,
         equipment_hint=vision.category if vision else None,
     )
-    # Матчинг уточняет доверие: код нашёлся — выше, не нашёлся — ниже
-    confidence = catalog_service.adjust_confidence(confidence, match)
+    if vision_first:
+        # Каталог здесь — ОБОГАЩЕНИЕ, а не приговор. Совпадение по коду поднимает
+        # доверие, отсутствие позиции в каталоге его НЕ понижает: деталь опознана
+        # по существу, а каталог из 57 позиций просто её не содержит.
+        confidence = max(confidence, catalog_service.adjust_confidence(confidence, match))
+    else:
+        # Матчинг уточняет доверие: код нашёлся — выше, не нашёлся — ниже
+        confidence = catalog_service.adjust_confidence(confidence, match)
 
     # ── Сохранение результата (FR-REC-03, FR-REC-05) ────────────────────────
     recognition = await db.scalar(select(Recognition).where(Recognition.scan_id == scan.id))
@@ -207,10 +236,29 @@ async def run_pipeline(db: AsyncSession, scan_id: uuid.UUID) -> PipelineOutcome:
     else:
         recognition.ocr_text = best.text or None
     recognition.maker_detected = best.maker or (vision.maker if vision else None)
-    recognition.oem_detected = best.oem_number
+    # В vision_first номер мог прочитать не OCR, а модель — сохраняем то, что
+    # реально пойдёт в каталог, иначе отчёт покажет пустой артикул.
+    recognition.oem_detected = oem_hint or best.oem_number
     recognition.model_version = model_version
     recognition.status = RecognitionStatus.auto.value
     recognition.detected_tokens = best.raw.get("tokens") if best.raw else None
+    # Развёрнутое опознание кладём в тот же JSON-столбец: он и задуман как сырьё
+    # по FR-REC-05, миграция не нужна. Отчёт берёт отсюда ответ «что это за
+    # деталь», когда позиции нет в каталоге.
+    if vision_first and vision:
+        recognition.detected_tokens = {
+            "identification": {
+                "part_type": vision.part_type,
+                "maker": vision.maker,
+                "model": vision.model,
+                "function": vision.function,
+                "markings": vision.markings,
+                "confidence": vision.confidence,
+                "notes": vision.notes,
+                "title": vision.title,
+            },
+            "ocr_tokens": best.raw.get("tokens") if best.raw else None,
+        }
     recognition.catalog_status = match.status.value
     recognition.part_id = match.primary.id if match.primary else None
 

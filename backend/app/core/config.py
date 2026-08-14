@@ -67,7 +67,9 @@ class Settings(BaseSettings):
     # ── Распознавание: провайдеры за адаптером (docs/06) ─────────────────────
     # Основной путь — OCR шильдика; fallback — облачная vision-модель.
     ocr_provider: str = "yandex"          # yandex | stub
-    vision_provider: str = "stub"         # llm | stub  (stub = выключено, конвейер деградирует мягко)
+    # openrouter — фронтир-модель зрения, основной определитель детали.
+    # llm | stub оставлены: stub = выключено, конвейер деградирует мягко.
+    vision_provider: str = "openrouter"
 
     yandex_ocr_url: str = "https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText"
     yandex_api_key: str = ""
@@ -76,6 +78,30 @@ class Settings(BaseSettings):
     vision_llm_url: str = ""
     vision_llm_api_key: str = ""
     vision_llm_model: str = ""
+
+    # ── Спайк: сильная vision-модель как ОСНОВНОЙ определитель ───────────────
+    # Каталог MVP узкий (57 позиций), и реальной детали в нём обычно нет: старый
+    # путь отвечал «не найдено» вместо ответа по существу. Новый путь включается
+    # флагом; ocr_first оставлен по умолчанию, чтобы прод не поехал.
+    # По умолчанию vision_first: на демо подтвердилось, что каталог из 57 позиций
+    # реальную деталь почти никогда не содержит, и прежний путь отвечал «не
+    # найдено» вместо ответа по существу. ocr_first остаётся доступен флагом —
+    # откатиться можно одной переменной, без правок кода.
+    recognition_mode: str = "vision_first"   # vision_first | ocr_first
+
+    # Потолок доверия к основному vision-пути. Он выше fallback-потолка (55):
+    # там модель лишь угадывала тип по картинке, здесь — целенаправленно
+    # опознаёт деталь и читает шильдик. Но 100 не даём: без сверки с каталогом
+    # или экспертом абсолютной уверенности быть не может (NFR-ACC-03).
+    vision_primary_max_confidence: int = 90
+
+    openrouter_url: str = "https://openrouter.ai/api/v1/chat/completions"
+    openrouter_api_key: str = ""
+    openrouter_model: str = "openai/gpt-4o"
+    openrouter_max_tokens: int = 700
+    # OpenRouter просит идентифицировать приложение — влияет на лимиты
+    openrouter_referer: str = ""
+    openrouter_title: str = "Sovfrasht Parts"
 
     # ── Надёжность внешних вызовов (NFR-REL-03) ──────────────────────────────
     external_timeout_seconds: float = 20.0

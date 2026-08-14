@@ -96,6 +96,23 @@ class RecognitionRead(BaseModel):
     catalog_status: str | None = None
 
 
+class IdentificationRead(BaseModel):
+    """Что определила vision-модель (FR-REC-01, режим vision_first).
+
+    Отвечает на главный вопрос «что это за деталь» независимо от каталога:
+    позиции может не быть в справочнике, но механику всё равно нужно знать,
+    что у него в руках.
+    """
+    title: str | None = None          # готовый заголовок: производитель + модель + тип
+    part_type: str | None = None
+    maker: str | None = None
+    model: str | None = None
+    function: str | None = None       # назначение на судне
+    markings: str | None = None       # что прочитано с шильдика/корпуса
+    confidence: int | None = None     # уверенность самой модели, до правок каталогом
+    notes: str | None = None          # что мешает уверенному ответу
+
+
 class ScanReport(BaseModel):
     """Полный отчёт по скану (B1, FR-REP-01..03)."""
     scan_id: uuid.UUID
@@ -104,6 +121,9 @@ class ScanReport(BaseModel):
     status: ScanStatus
     created_at: datetime
     recognition: RecognitionRead | None = None
+    # Опознание vision-моделью. Заполнено и когда каталожной позиции нет —
+    # именно оно отвечает пользователю «что это за деталь» (FR-REC-01).
+    identification: IdentificationRead | None = None
     part: PartBrief | None = None                     # найденная позиция каталога
     candidates: list[CandidateRead] = Field(default_factory=list)
     alternatives: list[AlternativeRead] = Field(default_factory=list)   # FR-REP-03

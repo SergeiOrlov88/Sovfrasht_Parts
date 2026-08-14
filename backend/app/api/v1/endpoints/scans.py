@@ -25,6 +25,7 @@ from app.schemas.scan import (
     FeedbackRequest,
     FeedbackResponse,
     FeedbackState,
+    IdentificationRead,
     PartBrief,
     RecognitionRead,
     ScanAccepted,
@@ -124,6 +125,16 @@ _CATALOG_MESSAGE = {
     "not_found": "Детали нет в каталоге. Коды подобрать не удалось — нужен эксперт.",
 }
 
+# Когда деталь опознана vision-моделью, «не найдено в каталоге» перестаёт быть
+# приговором: это лишь значит, что кодов для закупки пока нет. Формулировку
+# меняем, иначе пользователь читает содержательный отчёт под сообщением о провале.
+_CATALOG_MESSAGE_IDENTIFIED = {
+    "matched": None,
+    "candidates": "Деталь опознана. Точного совпадения в каталоге нет — показаны близкие позиции.",
+    "not_found": "Деталь опознана, но в каталоге закупки её нет: "
+                 "кодов и поставщиков пока не подобрать.",
+}
+
 
 @router.get("/scans/{scan_id}/report", response_model=ScanReport, summary="Отчёт по скану")
 async def get_report(scan_id: uuid.UUID, user: User = Depends(get_current_user),
@@ -160,9 +171,12 @@ async def get_report(scan_id: uuid.UUID, user: User = Depends(get_current_user),
                                      corrected_part_id=recognition.part_id,
                                      at=recognition.feedback_at)
 
+    identification = report_service.extract_identification(recognition)
+
     message = _STATUS_MESSAGE.get(scan_status)
     if recognition is not None:
-        message = _CATALOG_MESSAGE.get(recognition.catalog_status or "", message) or message
+        table = _CATALOG_MESSAGE_IDENTIFIED if identification else _CATALOG_MESSAGE
+        message = table.get(recognition.catalog_status or "", message) or message
 
     confidence = recognition.confidence if recognition else None
     needs_expert = scan_status is ScanStatus.needs_review or below_threshold
@@ -174,6 +188,7 @@ async def get_report(scan_id: uuid.UUID, user: User = Depends(get_current_user),
         status=scan_status,
         created_at=scan.created_at,
         recognition=RecognitionRead.model_validate(recognition) if recognition else None,
+        identification=IdentificationRead(**identification) if identification else None,
         part=PartBrief.model_validate(part) if part else None,
         candidates=candidates,
         alternatives=alternatives,
@@ -182,7 +197,8 @@ async def get_report(scan_id: uuid.UUID, user: User = Depends(get_current_user),
         confidence=confidence,
         confidence_level=report_service.confidence_level(confidence) if recognition else None,
         warning=report_service.build_warning(
-            confidence, recognition.catalog_status if recognition else None
+            confidence, recognition.catalog_status if recognition else None,
+            identified=bool(identification),
         ) if recognition else None,
         # Подтверждать имеет смысл только когда есть что подтверждать
         can_confirm=bool(ready and (part or candidates) and feedback is None),
