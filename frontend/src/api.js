@@ -1,5 +1,10 @@
 // Тонкий клиент API. Доменной логики здесь нет — она на бэкенде (NFR-MAINT-01).
-const BASE = '/api/v1'
+//
+// VITE_API_BASE задаётся на сборке. Пусто (по умолчанию) — запросы идут
+// относительными путями: в разработке их проксирует Vite, за общим nginx это
+// тоже верно. Для сборки, которая раздаётся отдельно от API (витрина на голом
+// IP), сюда подставляется абсолютный адрес бэкенда.
+const BASE = (import.meta.env.VITE_API_BASE || '') + '/api/v1'
 
 const ACCESS_KEY = 'sp_access_token'
 const REFRESH_KEY = 'sp_refresh_token'
@@ -90,3 +95,16 @@ export const resolveTask = (taskId, { resolution, correct_part_id }) =>
 // ── Уведомления ──────────────────────────────────────────────────────────────
 export const listNotifications = () => request('/notifications')
 export const readNotification = (id) => request(`/notifications/${id}/read`, { method: 'POST' })
+
+// ── Съёмка и распознавание (A1) ──────────────────────────────────────────────
+// FormData отправляем как есть: Content-Type с boundary браузер проставит сам,
+// вручную его задавать нельзя — запрос развалится.
+export const createScan = async (form) => {
+  const headers = {}
+  if (tokens.access) headers['Authorization'] = `Bearer ${tokens.access}`
+  const response = await fetch(`${BASE}/scans`, { method: 'POST', headers, body: form })
+  if (!response.ok) throw await toError(response)
+  return response.json()
+}
+
+export const getScan = (scanId) => request(`/scans/${scanId}`)

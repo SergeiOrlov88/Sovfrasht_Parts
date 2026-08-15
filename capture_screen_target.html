@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Экран съёмки — целевой вид</title>
+<style>
+  :root{--bg:#0a1420;--bg2:#0d1b2a;--panel:#132639;--panel2:#18324a;--line:#22405c;--ink:#eaf2fb;--mut:#8aa6c2;--mut2:#5f7d9c;--acc:#2fc4a3;--acc2:#38b6ff}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:radial-gradient(900px 500px at 50% -8%,#173350,#0a1420 60%),#0a1420;color:var(--ink);
+    min-height:100vh;display:flex;justify-content:center;padding:0 16px 40px}
+  /* центрированная колонка — фикс «пустоты слева» на десктопе */
+  .app{width:100%;max-width:460px}
+  /* верхняя панель */
+  .bar{display:flex;align-items:center;gap:10px;padding:16px 4px 14px;position:sticky;top:0;
+    background:linear-gradient(#0a1420,#0a1420f0);backdrop-filter:blur(6px);z-index:5}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--acc),var(--acc2));
+    display:grid;place-items:center;color:#04121b;font-weight:900;font-size:17px}
+  .brand{font-weight:700;font-size:16px;line-height:1.1}
+  .brand small{display:block;color:var(--mut);font-size:11px;font-weight:400;margin-top:1px}
+  .user{margin-left:auto;text-align:right;font-size:11.5px;color:var(--mut)}
+  .user b{color:var(--ink);font-weight:600;display:block;font-size:12.5px}
+  .logout{color:var(--acc2);font-size:11.5px;cursor:pointer;text-decoration:none}
+
+  h1{font-size:20px;margin:8px 2px 4px}
+  .lead{color:var(--mut);font-size:13.5px;margin:0 2px 18px}
+
+  /* главный слот — шильдик, крупный, с «видоискателем» */
+  .hero{background:linear-gradient(160deg,#12283d,#0e2033);border:1px solid var(--line);border-radius:18px;
+    padding:18px;margin-bottom:14px;position:relative;overflow:hidden}
+  .hero .req{position:absolute;top:14px;right:14px;font-size:10.5px;color:var(--acc);
+    background:rgba(47,196,163,.14);border:1px solid rgba(47,196,163,.4);padding:3px 9px;border-radius:20px}
+  .hero h3{font-size:15px;margin-bottom:3px}
+  .hero p{color:var(--mut);font-size:12.5px;margin-bottom:14px;max-width:82%}
+  .vf{height:150px;border-radius:13px;border:1.5px dashed #2f5a7a;position:relative;margin-bottom:14px;
+    background:repeating-linear-gradient(45deg,#0c1c2c,#0c1c2c 12px,#0e2033 12px,#0e2033 24px);
+    display:grid;place-items:center}
+  .vf .corner{position:absolute;width:22px;height:22px;border:3px solid var(--acc)}
+  .vf .tl{top:12px;left:12px;border-right:0;border-bottom:0;border-radius:5px 0 0 0}
+  .vf .tr{top:12px;right:12px;border-left:0;border-bottom:0;border-radius:0 5px 0 0}
+  .vf .bl{bottom:12px;left:12px;border-right:0;border-top:0;border-radius:0 0 0 5px}
+  .vf .br{bottom:12px;right:12px;border-left:0;border-top:0;border-radius:0 0 5px 0}
+  .vf .ico{font-size:34px;opacity:.55}
+  .btn{width:100%;padding:15px;border:0;border-radius:13px;font-size:15px;font-weight:700;cursor:pointer;
+    background:linear-gradient(135deg,var(--acc),var(--acc2));color:#04121b;
+    box-shadow:0 10px 24px rgba(47,196,163,.28);display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn:active{transform:translateY(1px)}
+
+  /* второстепенные слоты — компактные, в ряд */
+  .row{display:flex;gap:12px;margin-bottom:16px}
+  .slot{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center}
+  .slot .ph{width:44px;height:44px;margin:0 auto 8px;border-radius:11px;background:#0c1c2c;
+    display:grid;place-items:center;font-size:20px;color:var(--mut)}
+  .slot h4{font-size:13px;margin-bottom:2px}
+  .slot small{color:var(--mut2);font-size:11px}
+  .slot .add{margin-top:9px;font-size:12px;color:var(--acc2);cursor:pointer}
+
+  .cta{width:100%;padding:16px;border:0;border-radius:14px;font-size:15.5px;font-weight:700;cursor:pointer;
+    background:linear-gradient(135deg,var(--acc),var(--acc2));color:#04121b;box-shadow:0 12px 26px rgba(47,196,163,.3)}
+  .cta.disabled{background:var(--panel2);color:var(--mut2);box-shadow:none;cursor:not-allowed}
+  .hint{text-align:center;font-size:11.5px;color:var(--mut2);margin:12px 4px 0;line-height:1.5}
+  .byid{display:block;text-align:center;margin-top:14px;font-size:12.5px;color:var(--mut);cursor:pointer}
+  .byid u{color:var(--acc2)}
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="bar">
+      <div class="logo">⚓</div>
+      <div class="brand">Совфрахт Детали<small>Распознавание · закупка · ремонт</small></div>
+      <div class="user"><b>Иванов И.И.</b>Механик · Балтика <a class="logout">Выйти</a></div>
+    </div>
+
+    <h1>Новый скан детали</h1>
+    <p class="lead">Сфотографируйте деталь — система определит её и подберёт варианты закупки и ремонта.</p>
+
+    <div class="hero">
+      <span class="req">обязательно</span>
+      <h3>📛 Шильдик</h3>
+      <p>Главный кадр. Снимите табличку с номером крупно, чтобы буквы читались.</p>
+      <div class="vf">
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+        <div class="ico">🔎</div>
+      </div>
+      <button class="btn">📷 Сфотографировать шильдик</button>
+    </div>
+
+    <div class="row">
+      <div class="slot">
+        <div class="ph">⚙️</div>
+        <h4>Деталь целиком</h4>
+        <small>Помогает определить тип</small>
+        <div class="add">＋ добавить</div>
+      </div>
+      <div class="slot">
+        <div class="ph">📍</div>
+        <h4>Место установки</h4>
+        <small>Необязательно</small>
+        <div class="add">＋ добавить</div>
+      </div>
+    </div>
+
+    <button class="cta">Распознать деталь</button>
+    <div class="hint">На телефоне кнопка откроет камеру, на компьютере — выбор файла. Живой предпросмотр с рамкой доступен по HTTPS.</div>
+    <span class="byid">Уже есть скан? <u>Открыть по id</u></span>
+  </div>
+</body>
+</html>
