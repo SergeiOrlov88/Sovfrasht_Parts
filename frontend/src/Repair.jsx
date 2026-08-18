@@ -1,15 +1,37 @@
-// Вкладка «Ремонт» (D1, FR-REPAIR-01/02): вердикт, обоснование,
-// сравнение «замена vs ремонт» и обязательный дисклеймер.
+// Вкладка «Ремонт» (D1, FR-REPAIR-01/02): вердикт-«штамп», сравнение
+// «ремонт vs замена» в двух колонках и обязательный дисклеймер.
+// Вёрстка по макету design_ref3.html: рекомендованная колонка подсвечена,
+// дисклеймер лежит внутри блока вердикта и не прячется никогда.
 import { useEffect, useState } from 'react'
 import { getRepair } from './api'
+import { BannerError, EmptyCamera } from './icons.jsx'
+import { SupplierRow } from './Purchase.jsx'
 
 const VERDICT = {
-  repair: { label: 'Ремонт', color: 'var(--ok)',
-            hint: 'Деталь, как правило, ремонтопригодна' },
-  replace: { label: 'Замена', color: 'var(--warn)',
-             hint: 'Как правило, выгоднее заменить' },
-  unknown: { label: 'Нет данных', color: 'var(--muted)',
-             hint: 'Отраслевого правила для этого типа детали пока нет' },
+  repair: {
+    stamp: 'ремонт',
+    title: 'Рекомендуем ремонт, замена не обязательна',
+    hint: 'Деталь этого типа, как правило, ремонтопригодна.',
+    block: ' repair-verdict--ok',
+    stampMod: ' verdict-stamp--ok',
+    pick: 'repair',
+  },
+  replace: {
+    stamp: 'замена',
+    title: 'Рекомендуем заменить, не ремонтировать',
+    hint: 'Судовой ремонт этого типа детали обычно не восстанавливает паспортный ресурс.',
+    block: '',
+    stampMod: '',
+    pick: 'replace',
+  },
+  unknown: {
+    stamp: 'нет данных',
+    title: 'Отраслевого правила для этого типа детали пока нет',
+    hint: 'Честнее сказать «не знаем», чем выдать эвристику за рекомендацию.',
+    block: ' repair-verdict--unknown',
+    stampMod: ' verdict-stamp--unknown',
+    pick: null,
+  },
 }
 
 export default function Repair({ report }) {
@@ -24,92 +46,94 @@ export default function Repair({ report }) {
 
   if (!part) {
     return (
-      <div className="card stub">
-        <p className="muted">
-          Деталь не определена — оценивать ремонтопригодность не по чему.
-          Уточните результат на вкладке «Отчёт».
+      <div className="empty-state">
+        <div className="empty-ico"><EmptyCamera /></div>
+        <h2>Оценивать не по чему</h2>
+        <p>
+          Позиции каталога для этой детали нет — стоимость ремонта считается
+          от цены новой. Уточните результат на вкладке «Отчёт».
         </p>
       </div>
     )
   }
 
-  if (error) return <p className="error">{error}</p>
-  if (!data) return <p className="muted">Загружаем рекомендацию…</p>
+  if (error) {
+    return (
+      <div className="banner banner--danger">
+        <BannerError />
+        <div>{error}</div>
+      </div>
+    )
+  }
+  if (!data) {
+    return (
+      <div className="stack">
+        <div className="skeleton sk-title" />
+        <div className="skeleton sk-block" />
+      </div>
+    )
+  }
 
   const v = VERDICT[data.verdict] || VERDICT.unknown
   const e = data.estimate
+  // Подсветку рекомендованной колонки красим в цвет вердикта: ремонт — acc,
+  // замена — warn, «нет данных» — не подсвечиваем вовсе
+  const pickCls = data.verdict === 'repair' ? ' is-pick-ok' : ' is-pick'
 
   return (
-    <>
-      <div className="card">
-        <div className="conf-row">
-          <span className="conf-label">Рекомендация</span>
-          <span className="conf-value" style={{ color: v.color }}>{v.label}</span>
-        </div>
-        <p className="muted small">{v.hint}</p>
-        {data.rationale && <p className="rationale">{data.rationale}</p>}
-        {data.rule_subtype && (
-          <p className="muted small">Правило по типу детали: {data.rule_subtype}</p>
-        )}
-      </div>
+    <div className="stack">
+      <div className={`repair-verdict${v.block}`}>
+        <div className={`verdict-stamp${v.stampMod}`}>{v.stamp}</div>
+        <h2>{v.title}</h2>
+        <p className="tiny muted" style={{ marginTop: 8 }}>{data.rationale || v.hint}</p>
 
-      {/* Сравнение «замена vs ремонт» (FR-REPAIR-01) */}
-      <div className="card">
-        <h3>Замена или ремонт</h3>
+        {/* Сравнение «ремонт vs замена» (FR-REPAIR-01) */}
         <div className="compare">
-          <div className="opt">
-            <div className="opt-title">Замена</div>
-            <div className="opt-value">{e.replace_price || 'цена по запросу'}</div>
-            <div className="muted small">
-              {e.replace_lead_time ? `срок ${e.replace_lead_time}` : 'срок уточняется'}
-              {e.replace_supplier ? ` · ${e.replace_supplier}` : ''}
-            </div>
+          <div className={`compare-col${v.pick === 'repair' ? pickCls : ''}`}>
+            <h3>Ремонт</h3>
+            <b className={e.repair_cost_estimate ? undefined : 'is-na'}>
+              {e.repair_cost_estimate || 'не рассчитан'}
+            </b>
+            <ul>
+              {e.repair_share && <li>{e.repair_share} от цены новой</li>}
+              {e.repair_time && <li>срок {e.repair_time}</li>}
+              {data.rule_subtype && <li>правило: {data.rule_subtype}</li>}
+              {v.pick === 'repair' && <li>рекомендация системы</li>}
+            </ul>
           </div>
-          <div className="opt">
-            <div className="opt-title">Ремонт</div>
-            <div className="opt-value">{e.repair_cost_estimate || '—'}</div>
-            <div className="muted small">
-              {e.repair_share ? `${e.repair_share} от цены новой` : 'доля не определена'}
-              {e.repair_time ? ` · срок ${e.repair_time}` : ''}
-            </div>
+          <div className={`compare-col${v.pick === 'replace' ? pickCls : ''}`}>
+            <h3>Замена</h3>
+            <b className={e.replace_price ? undefined : 'is-na'}>
+              {e.replace_price || 'по запросу'}
+            </b>
+            <ul>
+              {e.replace_lead_time && <li>поставка {e.replace_lead_time}</li>}
+              {e.replace_supplier && <li>{e.replace_supplier}</li>}
+              {!e.replace_price && <li>цена неизвестна</li>}
+              {v.pick === 'replace' && <li>рекомендация системы</li>}
+            </ul>
           </div>
         </div>
-        {!e.replace_price && (
-          <p className="muted small">
-            Цена замены неизвестна — оценка ремонта не рассчитана.
-          </p>
-        )}
+
+        {/* Обязателен при любом вердикте (FR-REPAIR-02) */}
+        <div className="disclaimer">
+          <strong>Обязательный дисклеймер</strong>
+          {data.disclaimer}
+        </div>
       </div>
 
       {/* Восстановленная деталь — третий путь между ремонтом и новой */}
       {data.reman_offers.length > 0 && (
-        <div className="card">
-          <h3>Восстановленная деталь</h3>
-          <ul className="list">
-            {data.reman_offers.map((o, i) => (
-              <li key={i}>
-                <div>
-                  <b>{o.supplier.name}</b>
-                  <div className="muted small">
-                    {o.price || 'цена по запросу'}
-                    {o.lead_time ? ` · срок ${o.lead_time}` : ''}
-                  </div>
-                </div>
-                {o.deep_link && (
-                  <a className="btn small" href={o.deep_link} target="_blank" rel="noreferrer">
-                    Открыть
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
+        <div>
+          <div className="section-label">
+            <span>Восстановленная деталь</span>
+            <span>{data.reman_offers.length}</span>
+          </div>
+          <div className="stack">
+            {data.reman_offers.map((o, i) => <SupplierRow key={i} offer={o} best={i === 0} />)}
+          </div>
         </div>
       )}
-
-      {/* Обязателен при любом вердикте (FR-REPAIR-02) */}
-      <div className="card">
-        <p className="warn-box">{data.disclaimer}</p>
-      </div>
-    </>
+    </div>
   )
 }

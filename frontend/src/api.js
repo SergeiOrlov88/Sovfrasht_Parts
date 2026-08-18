@@ -4,6 +4,19 @@
 // относительными путями: в разработке их проксирует Vite, за общим nginx это
 // тоже верно. Для сборки, которая раздаётся отдельно от API (витрина на голом
 // IP), сюда подставляется абсолютный адрес бэкенда.
+//
+// Отдельно: дев-стаб (devMock.js). Он подменяет транспорт, а не контракт —
+// пути и поля ответов те же. Нужен, чтобы смотреть вёрстку состояний, которые
+// на демо-сервере не воспроизводятся: vision-модель там отключена
+// (ADR-06, гео-блокировка LLM-API). Включается флагом VITE_MOCK=1 в dev.
+//
+// Подключается динамическим import(): в прод-сборке import.meta.env.DEV — это
+// литерал false, вся ветка сворачивается и devMock.js в бандл не попадает.
+export const MOCK_ENABLED = import.meta.env.DEV && import.meta.env.VITE_MOCK === '1'
+
+let mockModule = null
+const mock = async () => (mockModule ||= await import('./devMock.js'))
+
 const BASE = (import.meta.env.VITE_API_BASE || '') + '/api/v1'
 
 const ACCESS_KEY = 'sp_access_token'
@@ -41,6 +54,8 @@ async function toError(response) {
 }
 
 async function request(path, { method = 'GET', body, auth = true } = {}) {
+  if (MOCK_ENABLED) return (await mock()).devMock(path, { method, body })
+
   const headers = {}
   if (body) headers['Content-Type'] = 'application/json'
   if (auth && tokens.access) headers['Authorization'] = `Bearer ${tokens.access}`
@@ -100,6 +115,8 @@ export const readNotification = (id) => request(`/notifications/${id}/read`, { m
 // FormData отправляем как есть: Content-Type с boundary браузер проставит сам,
 // вручную его задавать нельзя — запрос развалится.
 export const createScan = async (form) => {
+  if (MOCK_ENABLED) return (await mock()).devMockScan()
+
   const headers = {}
   if (tokens.access) headers['Authorization'] = `Bearer ${tokens.access}`
   const response = await fetch(`${BASE}/scans`, { method: 'POST', headers, body: form })

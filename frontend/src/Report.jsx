@@ -1,9 +1,15 @@
-// Экран отчёта по скану (B1, FR-REP-01..04). Три вкладки как в прототипе:
-// «Отчёт» (B1), «Закупка» (C1/C2) и «Ремонт» (D1).
+// Экран отчёта по скану (B1, FR-REP-01..04). Вёрстка по эталонному макету
+// design_ref3.html: опознание — СВЕРХУ, карточкой с градиентной кромкой и
+// круговым индикатором достоверности; под ним — плашки состояния и только
+// затем три вкладки «Отчёт» (B1), «Закупка» (C1/C2) и «Ремонт» (D1).
+//
+// Опознание идёт первым сознательно: главный вопрос механика — «что у меня в
+// руках», и ответ на него не зависит от того, нашлась ли позиция в каталоге.
 import { useEffect, useState } from 'react'
 import { getReport, sendFeedback } from './api'
 import Purchase from './Purchase.jsx'
 import Repair from './Repair.jsx'
+import { BannerDanger, BannerError, BannerOk, BannerWarn, EmptyCamera } from './icons.jsx'
 
 const TABS = [
   { key: 'report', label: 'Отчёт' },
@@ -11,16 +17,47 @@ const TABS = [
   { key: 'repair', label: 'Ремонт' },
 ]
 
-const LEVEL_COLOR = { high: 'var(--ok)', medium: 'var(--warn)', low: 'var(--bad)' }
-const LEVEL_LABEL = { high: 'Высокая', medium: 'Средняя', low: 'Низкая' }
+// Порог достоверности из макета 3: ≥70 — зелёный, 40–69 — жёлтый, <40 — красный.
+// Нижний порог совпадает с CONFIDENCE_THRESHOLD бэкенда (FR-REC-04).
+const HIGH = 70
+const MID = 40
 
-function Field({ label, value }) {
+/** Круговой индикатор достоверности. pathLength=100 → длина дуги = проценты. */
+function ConfidenceMeter({ value }) {
+  const pct = Math.max(0, Math.min(100, Math.round(value ?? 0)))
+  const mod = pct >= HIGH ? '' : pct >= MID ? ' confidence-meter--mid' : ' confidence-meter--low'
+  const label = pct >= HIGH ? 'уверенность' : pct >= MID ? 'средняя' : 'низкая'
+  return (
+    <div className={`confidence-meter${mod}`} style={{ '--val': String(pct) }}
+      aria-label={`Достоверность ${pct} процентов`}>
+      <svg viewBox="0 0 36 36" aria-hidden="true">
+        <circle className="cm-track" cx="18" cy="18" r="15.5" pathLength="100" />
+        <circle className="cm-val" cx="18" cy="18" r="15.5" pathLength="100" />
+      </svg>
+      <div className="cm-center"><b>{pct}<small>%</small></b><span>{label}</span></div>
+    </div>
+  )
+}
+
+/** Поле карточки опознания. Пустые значения не показываем. */
+function Field({ label, value, mono, wide }) {
   if (!value) return null
   return (
-    <>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </>
+    <div className={`id-field${wide ? ' id-field--wide' : ''}`}>
+      <span>{label}</span>
+      <b className={mono ? 'mono' : undefined}>{value}</b>
+    </div>
+  )
+}
+
+/** Ячейка каталожного кода — моноширинным, коды сверяют посимвольно. */
+function CodeCell({ label, value }) {
+  if (!value) return null
+  return (
+    <div className="code-cell">
+      <span>{label}</span>
+      <b>{value}</b>
+    </div>
   )
 }
 
@@ -59,199 +96,289 @@ export default function Report({ scanId, onBack }) {
     }
   }
 
-  if (error && !data) return <p className="error">{error}</p>
-  if (!data) return <p className="muted">Загружаем отчёт…</p>
+  if (error && !data) {
+    return (
+      <div className="screen-body">
+        <button className="btn btn--link" onClick={onBack}>← К съёмке</button>
+        <div className="banner banner--danger">
+          <BannerError />
+          <div><b>Отчёт не открылся</b>{error}</div>
+        </div>
+      </div>
+    )
+  }
+  if (!data) {
+    return (
+      <div className="screen-body">
+        <div className="panel scan-panel">
+          <div className="scan-line" />
+          <div className="skeleton sk-title" />
+          <div className="skeleton sk-line" style={{ width: '88%' }} />
+          <div className="skeleton sk-line" style={{ width: '64%' }} />
+          <div className="skeleton sk-block" />
+        </div>
+      </div>
+    )
+  }
 
   // identification — что определила vision-модель. Приходит и тогда, когда
   // каталожной позиции нет: именно оно отвечает «что это за деталь».
   const { part, candidates, alternatives, recognition, identification: ident } = data
-  const level = data.confidence_level || 'low'
+  const confidence = data.confidence ?? 0
+  const isLow = confidence < HIGH || data.confidence_level === 'low'
+  const noCatalog = !part && Boolean(ident)
+  const specs = part?.specs ? Object.entries(part.specs) : []
 
   return (
-    <section className="report">
-      <button className="link" onClick={onBack}>← К списку</button>
+    <div className="screen-body screen-body--tight">
+      <button className="btn btn--link" onClick={onBack}>← К съёмке</button>
 
-      <div className="tabs" role="tablist">
+      {/* ── Опознание: сверху, до каталога (FR-REC-01) ─────────────────────── */}
+      <article className="identification-card">
+        <div className="id-top">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="kicker">{isLow ? 'Опознание · черновик' : 'Опознание'}</div>
+            <h2>{part ? part.name : (ident?.title || 'Деталь не определена')}</h2>
+            {ident?.part_type && <div className="id-type">{ident.part_type}</div>}
+          </div>
+          <ConfidenceMeter value={confidence} />
+        </div>
+
+        {(ident || part) && (
+          <div className="id-grid">
+            <Field label="Производитель" value={ident?.maker || part?.maker} />
+            <Field label="Модель" value={ident?.model} mono />
+            <Field label="Назначение" value={ident?.function} wide />
+            <Field label="Узел" value={part?.equipment} wide />
+          </div>
+        )}
+
+        {/* Маркировка — моноширинным: её сверяют с деталью посимвольно */}
+        {(ident?.markings || recognition?.oem_detected) && (
+          <div className="id-mark">
+            <span>{ident?.markings ? 'Прочитанная маркировка' : 'Считано с шильдика'}</span>
+            <code>{ident?.markings || recognition.oem_detected}</code>
+          </div>
+        )}
+
+        {ident?.notes && <p className="id-caveat">Оговорка: {ident.notes}</p>}
+      </article>
+
+      {/* ── Две отдельные плашки: порог и каталог — это разные проблемы ────── */}
+      {isLow && (
+        <div className="banner banner--danger">
+          <BannerDanger />
+          <div>
+            <b>Достоверность ниже порога {HIGH}%</b>
+            {data.warning
+              || 'Автоподтверждение отключено. Заявка уйдёт эксперту — механик не принимает решение по коду.'}
+          </div>
+        </div>
+      )}
+
+      {noCatalog && (
+        <div className="banner banner--warn">
+          <BannerWarn />
+          <div>
+            <b>Опознана, но в каталоге закупки не найдена</b>
+            Нет карточки IMPA/OEM Совфрахт. Нельзя выставить поставщиков и цену.
+          </div>
+        </div>
+      )}
+
+      {(isLow || noCatalog) && (
+        <>
+          <div className="btn-row">
+            <button className="btn btn--warn btn--sm" disabled={busy || !data.can_request_expert}
+              onClick={() => feedback('reject')}>
+              Отправить эксперту
+            </button>
+            {/* BL-10: эндпоинта заведения позиции ещё нет — кнопка на своём месте
+                по макету, но без действия */}
+            <button className="btn btn--ghost btn--sm" disabled>Добавить в каталог</button>
+          </div>
+          <p className="tiny muted">
+            «Добавить в каталог» доступно снабженцу и админу. Механик видит кнопку
+            серой. Действие пока отключено: заведение позиции из опознания в работе (BL-10).
+          </p>
+        </>
+      )}
+
+      {notice && (
+        <div className="banner banner--ok">
+          <BannerOk />
+          <div>{notice}</div>
+        </div>
+      )}
+      {error && (
+        <div className="banner banner--danger">
+          <BannerError />
+          <div>{error}</div>
+        </div>
+      )}
+
+      {/* ── Вкладки ────────────────────────────────────────────────────────── */}
+      <nav className="tab-bar" role="tablist" aria-label="Разделы отчёта">
         {TABS.map(t => (
-          <button key={t.key} role="tab" aria-selected={tab === t.key}
-            className={`tab ${tab === t.key ? 'active' : ''}`}
+          <button key={t.key} role="tab" aria-selected={tab === t.key} type="button"
+            className={tab === t.key ? 'is-active' : undefined}
             onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
-      </div>
+      </nav>
 
       {tab === 'purchase' && <Purchase report={data} />}
-
       {tab === 'repair' && <Repair report={data} />}
 
       {tab === 'report' && (
-        <>
-          {/* Индикатор достоверности (FR-REP-02) */}
-          <div className="card">
-            <div className="conf-row">
-              <span className="conf-label">Достоверность</span>
-              <span className="conf-value" style={{ color: LEVEL_COLOR[level] }}>
-                {data.confidence ?? 0}% · {LEVEL_LABEL[level]}
-              </span>
-            </div>
-            <div className="conf-bar">
-              <span style={{ width: `${data.confidence ?? 0}%`, background: LEVEL_COLOR[level] }} />
-            </div>
-            {data.warning && <p className="warn-box">{data.warning}</p>}
-            {notice && <p className="ok-box">{notice}</p>}
-            {error && <p className="error">{error}</p>}
-          </div>
+        <div className="stack">
+          {/* Позиция найдена в каталоге — показываем коды закупки */}
+          {part && (
+            <>
+              <div className="banner banner--ok">
+                <BannerOk />
+                <div>
+                  <b>Есть в каталоге закупки Совфрахт</b>
+                  {part.impa_code
+                    ? `Сопоставлено с карточкой IMPA ${part.impa_code}`
+                    : 'Позиция найдена в справочнике'}
+                  {part.maker ? ` · ${part.maker}` : ''}.
+                </div>
+              </div>
 
-          {/* Что это за деталь (FR-REC-01).
-              Главный вопрос механика. Отвечаем на него ДО каталога: позиции в
-              справочнике может не быть, но знать, что в руках, нужно всегда.
-              Заголовок берём из каталога, если он есть, иначе — из опознания. */}
-          <div className="card">
-            <h2>{part ? part.name : (ident?.title || 'Деталь не определена')}</h2>
+              {/* Только коды — их сверяют посимвольно, поэтому моноширинный.
+                  Категория и прочее кодом не является и живёт ниже. */}
+              <div className="codes">
+                <CodeCell label="IMPA" value={part.impa_code} />
+                <CodeCell label="ISSA" value={part.issa_code} />
+                <CodeCell label="OEM" value={part.oem_number} />
+              </div>
 
-            {ident && (
-              <dl className="props">
-                <Field label="Тип детали" value={ident.part_type} />
-                <Field label="Производитель" value={ident.maker} />
-                <Field label="Модель" value={ident.model} />
-                <Field label="Назначение" value={ident.function} />
-                <Field label="Прочитано с детали" value={ident.markings} />
-              </dl>
-            )}
+              {(part.category || specs.length > 0) && (
+                <div className="panel">
+                  <div className="section-label"><span>Характеристики</span></div>
+                  <div className="id-grid" style={{ marginTop: 0 }}>
+                    <Field label="Категория" value={part.category} />
+                    {specs.map(([k, v]) => <Field key={k} label={k} value={String(v)} />)}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
-            {ident?.notes && (
-              <p className="muted small">Оговорка модели: {ident.notes}</p>
-            )}
-
-            {/* Каталожные коды — только если позиция найдена */}
-            {part && (
-              <dl className="props">
-                <Field label="Оборудование" value={part.equipment} />
-                <Field label="IMPA" value={part.impa_code} />
-                <Field label="ISSA" value={part.issa_code} />
-                <Field label="OEM" value={part.oem_number} />
-                <Field label="Категория" value={part.category} />
-                {part.specs && Object.entries(part.specs).map(([k, v]) => (
-                  <Field key={k} label={k} value={String(v)} />
-                ))}
-              </dl>
-            )}
-
-            {/* Каталога нет, но и опознания нет — только тогда прежний текст */}
-            {!part && !ident && (
-              <p className="muted">
+          {/* Ни каталога, ни опознания */}
+          {!part && !ident && (
+            <div className="empty-state">
+              <div className="empty-ico"><EmptyCamera /></div>
+              <h2>Деталь не определена</h2>
+              <p>
                 {recognition?.oem_detected
                   ? `С шильдика считан номер ${recognition.oem_detected}, но в каталоге его нет.`
-                  : 'Номер на шильдике распознать не удалось.'}
+                  : 'Номер на шильдике распознать не удалось. Переснимите шильдик крупнее или отправьте кадры эксперту.'}
               </p>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Деталь опознана, но кодов для закупки нет. Отдельная плашка, чтобы
-              пользователь не принял содержательный отчёт за неудачу (FR-CAT-04). */}
-          {!part && ident && (
-            <div className="card">
-              <p className="warn-box" style={{ marginTop: 0 }}>
-                В каталоге закупки этой детали нет — коды и поставщиков подобрать
-                не удалось. Опознание выше сделано по фотографиям.
-              </p>
-              <div className="actions">
-                {data.can_request_expert && (
-                  <button className="btn" disabled={busy}
-                    onClick={() => feedback('reject')}>Отправить эксперту</button>
-                )}
+          {/* Фото скана — по подписанным ссылкам (NFR-SEC-04) */}
+          {data.photos.length > 0 && (
+            <div>
+              <div className="section-label">
+                <span>Снимки</span><span>{data.photos.length} кадра</span>
               </div>
-              <p className="muted small">
-                Эксперт подтвердит деталь и заведёт её в каталог — после этого
-                появятся коды, поставщики и оценка ремонта.
-              </p>
+              <div className="photo-strip">
+                {data.photos.map(p => (
+                  <figure key={p.id}>
+                    <img src={p.url} alt={p.kind} loading="lazy" />
+                    <figcaption>{p.kind}</figcaption>
+                  </figure>
+                ))}
+              </div>
             </div>
           )}
 
           {/* Кандидаты (NFR-ACC-02) */}
           {candidates.length > 0 && (
-            <div className="card">
-              <h3>Кандидаты</h3>
-              <ul className="list">
+            <div>
+              <div className="section-label">
+                <span>Кандидаты</span><span>{candidates.length}</span>
+              </div>
+              <div className="stack">
                 {candidates.map(c => (
-                  <li key={c.part.id}>
-                    <div>
+                  <div className="candidate" key={c.part.id}>
+                    <span className="radio" />
+                    <div className="grow">
                       <b>{c.part.name}</b>
-                      <span className="muted"> · {c.part.maker || '—'} · {c.part.oem_number || 'без номера'}</span>
-                    </div>
-                    <div className="row">
-                      <span className="pill">{Math.round(c.relevance * 100)}%</span>
+                      <p className="tiny muted">
+                        {c.part.maker || '—'} · <span className="mono">{c.part.oem_number || 'без номера'}</span>
+                        {' · '}{Math.round(c.relevance * 100)}%
+                      </p>
                       {correcting && (
-                        <button className="btn small" disabled={busy}
-                          onClick={() => feedback('reject', c.part.id)}>Это верная</button>
+                        <button className="btn btn--ghost btn--sm" style={{ marginTop: 8 }}
+                          disabled={busy} onClick={() => feedback('reject', c.part.id)}>
+                          Это верная
+                        </button>
                       )}
                     </div>
-                  </li>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
 
           {/* Аналоги (FR-REP-03) */}
           {alternatives.length > 0 && (
-            <div className="card">
-              <h3>Аналоги и заменители</h3>
-              <ul className="list">
+            <div>
+              <div className="section-label">
+                <span>Аналоги и заменители</span>
+                <span className="pill pill--warn">не OEM</span>
+              </div>
+              <div className="stack">
                 {alternatives.map(a => (
-                  <li key={a.part.id}>
-                    <div>
-                      <b>{a.part.name}</b>
-                      <span className="muted"> · {a.part.maker || '—'} · {a.part.oem_number || '—'}</span>
-                      {a.note && <div className="muted small">{a.note}</div>}
-                    </div>
-                    <span className="pill">{a.compatibility}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Действия (FR-REP-04) */}
-          <div className="card actions">
-            {data.feedback ? (
-              <p className="muted">
-                Вы уже ответили: {data.feedback.verdict === 'confirm' ? 'подтверждено' : 'отклонено'}.
-              </p>
-            ) : (
-              <>
-                {data.can_confirm && (
-                  <button className="btn" disabled={busy}
-                    onClick={() => feedback('confirm')}>Всё верно</button>
-                )}
-                <button className="btn ghost" disabled={busy}
-                  onClick={() => setCorrecting(v => !v)}>
-                  {correcting ? 'Отмена' : 'Не та деталь'}
-                </button>
-                {data.can_request_expert && (
-                  <button className="btn ghost" disabled={busy}
-                    onClick={() => feedback('reject')}>Отправить эксперту</button>
-                )}
-              </>
-            )}
-            {correcting && candidates.length === 0 && (
-              <p className="muted small">
-                Кандидатов нет — нажмите «Отправить эксперту», он определит деталь.
-              </p>
-            )}
-          </div>
-
-          {/* Фото скана — по подписанным ссылкам (NFR-SEC-04) */}
-          {data.photos.length > 0 && (
-            <div className="card">
-              <h3>Фото</h3>
-              <div className="thumbs">
-                {data.photos.map(p => (
-                  <img key={p.id} src={p.url} alt={p.kind} loading="lazy" />
+                  <div className="panel" key={a.part.id}>
+                    <b style={{ fontSize: 15 }}>{a.part.name}</b>
+                    <p className="tiny muted" style={{ marginTop: 4 }}>
+                      {a.part.maker || '—'} · <span className="mono">{a.part.oem_number || '—'}</span>
+                      {' · совместимость: '}{a.compatibility}
+                    </p>
+                    {a.note && <p className="tiny muted" style={{ marginTop: 4 }}>{a.note}</p>}
+                  </div>
                 ))}
               </div>
             </div>
           )}
-        </>
+
+          {/* Действия (FR-REP-04) */}
+          <div className="panel">
+            <div className="section-label"><span>Результат верен?</span></div>
+            {data.feedback ? (
+              <p className="tiny muted">
+                Вы уже ответили: {data.feedback.verdict === 'confirm' ? 'подтверждено' : 'отклонено'}.
+              </p>
+            ) : (
+              <>
+                <div className="btn-row">
+                  <button className="btn btn--primary btn--sm"
+                    disabled={busy || !data.can_confirm}
+                    onClick={() => feedback('confirm')}>Всё верно</button>
+                  <button className="btn btn--ghost btn--sm" disabled={busy}
+                    onClick={() => setCorrecting(v => !v)}>
+                    {correcting ? 'Отмена' : 'Не та деталь'}
+                  </button>
+                </div>
+                {correcting && candidates.length === 0 && (
+                  <p className="tiny muted" style={{ marginTop: 8 }}>
+                    Кандидатов нет — нажмите «Отправить эксперту», он определит деталь.
+                  </p>
+                )}
+                {correcting && candidates.length > 0 && (
+                  <p className="tiny muted" style={{ marginTop: 8 }}>
+                    Выберите верную позицию в списке кандидатов выше.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       )}
-    </section>
+    </div>
   )
 }

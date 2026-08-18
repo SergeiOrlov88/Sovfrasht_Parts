@@ -1,6 +1,10 @@
-// Верхняя панель приложения: логотип, название, кто вошёл и выход.
+// Верхняя панель приложения: марка, название, роль и контекст (судно или скан).
 // Одна и та же на всех экранах — так у пользователя всегда есть точка возврата
 // и видно, от чьего имени и по какому судну он работает (docs/09).
+// Вёрстка по макету design_ref3.html: слева бренд в две строки, справа
+// ролевая пилюля с индикатором и подпись контекста.
+import { BrandMark } from './icons.jsx'
+
 const ROLE_LABELS = {
   mechanic: 'Механик',
   supplier_manager: 'Снабженец',
@@ -9,7 +13,10 @@ const ROLE_LABELS = {
   admin: 'Администратор',
 }
 
-export default function AppBar({ user, onLogout, onExpert }) {
+// Роли модерации отличаем цветом пилюли: панель эксперта — не борт
+const INFO_ROLES = ['expert', 'admin']
+
+export default function AppBar({ user, onLogout, onExpert, context }) {
   const role = ROLE_LABELS[user.role] || user.role
   // Судов у механика обычно одно; если несколько — показываем первое и счётчик,
   // чтобы панель не разъезжалась
@@ -17,25 +24,25 @@ export default function AppBar({ user, onLogout, onExpert }) {
   const vessel = vessels.length
     ? vessels[0].name + (vessels.length > 1 ? ` +${vessels.length - 1}` : '')
     : null
+  const sub = context || vessel
 
   return (
-    <div className="bar">
-      <div className="logo">⚓</div>
+    <header className="app-bar">
       <div className="brand">
-        Совфрахт Детали
-        <small>Распознавание · закупка · ремонт</small>
+        <div className="brand-mark" aria-hidden="true"><BrandMark /></div>
+        <div className="brand-name">Совфрахт<span>Детали</span></div>
       </div>
-      <div className="user">
-        <b>{user.full_name}</b>
-        {role}{vessel ? ` · ${vessel}` : ''}{' '}
-        {onExpert && (
-          <>
-            <button className="logout" onClick={onExpert}>Очередь</button>
-            {' · '}
-          </>
-        )}
-        <button className="logout" onClick={onLogout}>Выйти</button>
+
+      <div className="role-stack">
+        <div className={`role-pill${INFO_ROLES.includes(user.role) ? ' role-pill--info' : ''}`}>
+          <i />{role}
+        </div>
+        {sub && <div className="role-sub">{sub}</div>}
+        <div className="bar-actions">
+          {onExpert && <button onClick={onExpert}>Очередь</button>}
+          <button onClick={onLogout}>Выйти</button>
+        </div>
       </div>
-    </div>
+    </header>
   )
 }

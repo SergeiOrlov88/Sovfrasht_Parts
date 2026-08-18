@@ -1,12 +1,16 @@
 // Вкладка «Закупка» (C1/C2): предложения поставщиков и оформление заявки.
-// Цены демонстрационные — это помечено явно, чтобы их не приняли за реальные.
+// Вёрстка по макету design_ref3.html: строка поставщика — логотип-инициалы,
+// название с метками, цена моноширинным справа. Первый оффер выделен рамкой:
+// бэкенд сортирует предложения по наличию, затем по цене, значит он и есть
+// лучший. Цены демонстрационные — это помечено меткой «демо».
 import { useEffect, useState } from 'react'
 import { createPartRequest, getOffers } from './api'
+import { BannerError, BannerOk, EmptyCamera, IconExternal } from './icons.jsx'
 
 const STOCK = {
-  in: { label: 'в наличии', color: 'var(--ok)' },
-  low: { label: 'мало', color: 'var(--warn)' },
-  out: { label: 'нет', color: 'var(--bad)' },
+  in: { label: 'в наличии', cls: 'pill--ok' },
+  low: { label: 'мало', cls: 'pill--warn' },
+  out: { label: 'нет в наличии', cls: 'pill--danger' },
 }
 
 const SUPPLIER_TYPE = {
@@ -16,29 +20,45 @@ const SUPPLIER_TYPE = {
   reman: 'восстановление',
 }
 
-function OfferRow({ offer }) {
-  const stock = STOCK[offer.stock_status] || { label: '—', color: 'var(--muted)' }
+/** Инициалы поставщика для плитки-логотипа: до трёх первых букв слов. */
+function initials(name) {
+  return (name || '?')
+    .split(/[\s·—-]+/)
+    .filter(Boolean)
+    .slice(0, 3)
+    .map(w => w[0].toUpperCase())
+    .join('')
+}
+
+export function SupplierRow({ offer, best }) {
+  const stock = STOCK[offer.stock_status]
   return (
-    <li>
+    <article className={`supplier-row${best ? ' is-best' : ''}`}>
+      <div className="sup-logo">{initials(offer.supplier.name)}</div>
       <div>
-        <b>{offer.supplier.name}</b>
-        <span className="muted"> · {SUPPLIER_TYPE[offer.supplier.type] || offer.supplier.type}</span>
-        {offer.supplier.region && <span className="muted"> · {offer.supplier.region}</span>}
-        <div className="muted small">
-          {offer.price || 'цена по запросу'}
-          {offer.lead_time ? ` · срок ${offer.lead_time}` : ''}
-          {offer.source !== 'api' ? ' · демо-данные' : ''}
+        <div className="sup-name">{offer.supplier.name}</div>
+        <div className="sup-meta">
+          {stock && <span className={`pill ${stock.cls}`}>{stock.label}</span>}
+          {offer.lead_time && <span className="pill">{offer.lead_time}</span>}
+          {offer.supplier.region && <span className="pill">{offer.supplier.region}</span>}
         </div>
       </div>
-      <div className="row">
-        <span className="pill" style={{ color: stock.color }}>{stock.label}</span>
-        {offer.deep_link && (
-          <a className="btn small" href={offer.deep_link} target="_blank" rel="noreferrer">
-            Открыть
-          </a>
-        )}
+      <div className="sup-price">
+        <b className={offer.price ? undefined : 'is-na'}>{offer.price || 'по запросу'}</b>
+        <span>
+          {SUPPLIER_TYPE[offer.supplier.type] || offer.supplier.type}
+          {offer.source !== 'api' ? ' · демо' : ''}
+        </span>
       </div>
-    </li>
+      {offer.deep_link && (
+        <div className="sup-link">
+          <a className="btn btn--ghost btn--block btn--sm" href={offer.deep_link}
+            target="_blank" rel="noreferrer">
+            <IconExternal width="16" height="16" /> Открыть у поставщика
+          </a>
+        </div>
+      )}
+    </article>
   )
 }
 
@@ -59,8 +79,13 @@ export default function Purchase({ report, onRequested }) {
 
   if (!part) {
     return (
-      <div className="card stub">
-        <p className="muted">Деталь не определена — закупать нечего. Уточните результат на вкладке «Отчёт».</p>
+      <div className="empty-state">
+        <div className="empty-ico"><EmptyCamera /></div>
+        <h2>Закупать нечего</h2>
+        <p>
+          Позиции каталога для этой детали нет — коды и поставщиков подобрать
+          не удалось. Уточните результат на вкладке «Отчёт».
+        </p>
       </div>
     )
   }
@@ -88,68 +113,100 @@ export default function Purchase({ report, onRequested }) {
     }
   }
 
-  return (
-    <>
-      {error && <p className="error">{error}</p>}
+  const offers = data?.offers || []
 
-      <div className="card">
-        <h3>Предложения поставщиков</h3>
-        {!data && <p className="muted">Загружаем…</p>}
-        {data?.message && <p className="muted">{data.message}</p>}
-        {data?.offers?.length > 0 && (
-          <ul className="list">
-            {data.offers.map((o, i) => <OfferRow key={i} offer={o} />)}
-          </ul>
-        )}
+  return (
+    <div className="stack">
+      {error && (
+        <div className="banner banner--danger">
+          <BannerError />
+          <div>{error}</div>
+        </div>
+      )}
+
+      <div className="codes">
+        {part.impa_code && <div className="code-cell"><span>IMPA</span><b>{part.impa_code}</b></div>}
+        {part.oem_number && <div className="code-cell"><span>OEM</span><b>{part.oem_number}</b></div>}
+      </div>
+
+      <div>
+        <div className="section-label">
+          <span>Поставщики</span>
+          {offers.length > 0 && <span>{offers.length} предложения</span>}
+        </div>
+        <div className="stack">
+          {!data && <div className="skeleton sk-block" />}
+          {data?.message && <p className="tiny muted">{data.message}</p>}
+          {offers.map((o, i) => <SupplierRow key={i} offer={o} best={i === 0} />)}
+          {data && offers.length === 0 && !data.message && (
+            <p className="tiny muted">Предложений нет.</p>
+          )}
+        </div>
       </div>
 
       {data?.alternatives?.map(alt => (
-        <div className="card" key={alt.part.id}>
-          <h3>Аналог: {alt.part.name}</h3>
-          <p className="muted small">
-            {alt.part.maker} · {alt.part.oem_number || 'без номера'} · совместимость: {alt.compatibility}
+        <div className="panel" key={alt.part.id}>
+          <div className="section-label" style={{ marginBottom: 8 }}>
+            <span>Аналог</span>
+            <span className="pill pill--warn">совместимость: {alt.compatibility}</span>
+          </div>
+          <h3 style={{ fontSize: 15, fontWeight: 700 }}>{alt.part.name}</h3>
+          <p className="tiny muted" style={{ margin: '6px 0 10px' }}>
+            {alt.part.maker || '—'} · <span className="mono">{alt.part.oem_number || 'без номера'}</span>
           </p>
           {alt.offers.length
-            ? <ul className="list">{alt.offers.map((o, i) => <OfferRow key={i} offer={o} />)}</ul>
-            : <p className="muted small">Предложений нет.</p>}
+            ? <div className="stack">{alt.offers.map((o, i) => <SupplierRow key={i} offer={o} />)}</div>
+            : <p className="tiny muted">Предложений нет.</p>}
         </div>
       ))}
 
-      <div className="card">
-        <h3>Заявка на снабжение</h3>
+      <div className="panel">
+        <div className="section-label"><span>Заявка на снабжение</span></div>
         {created ? (
-          <p className="ok-box">
-            Заявка создана, статус «{created.status}».
-            {created.idempotent_reuse && ' Такая заявка уже была — повторно не создавали.'}
-          </p>
+          <div className="banner banner--ok">
+            <BannerOk />
+            <div>
+              <b>Заявка создана</b>
+              Статус «{created.status}».
+              {created.idempotent_reuse && ' Такая заявка уже была — повторно не создавали.'}
+            </div>
+          </div>
         ) : (
-          <>
-            <label htmlFor="qty">Количество</label>
-            <input id="qty" type="number" min="1" value={qty}
-              onChange={e => setQty(e.target.value)} />
+          <div className="stack">
+            <div className="field">
+              <label htmlFor="qty">Количество</label>
+              <input id="qty" type="number" min="1" value={qty}
+                onChange={e => setQty(e.target.value)} />
+            </div>
 
-            <label htmlFor="prio">Приоритет</label>
-            <select id="prio" value={priority} onChange={e => setPriority(e.target.value)}>
-              <option value="low">низкий</option>
-              <option value="normal">обычный</option>
-              <option value="urgent">срочно</option>
-            </select>
+            <div className="field">
+              <label htmlFor="prio">Приоритет</label>
+              <select id="prio" value={priority} onChange={e => setPriority(e.target.value)}>
+                <option value="low">низкий</option>
+                <option value="normal">обычный</option>
+                <option value="urgent">срочно</option>
+              </select>
+            </div>
 
-            <label htmlFor="cmt">Комментарий</label>
-            <input id="cmt" value={comment} onChange={e => setComment(e.target.value)}
-              placeholder="необязательно" />
+            <div className="field">
+              <label htmlFor="cmt">Комментарий</label>
+              <input id="cmt" value={comment} onChange={e => setComment(e.target.value)}
+                placeholder="необязательно" />
+            </div>
 
-            <button className="btn" disabled={busy || qty < 1} onClick={submit}>
-              {busy ? 'Оформляем…' : 'Оформить заявку'}
+            <button className="btn btn--primary btn--block" disabled={busy || qty < 1}
+              onClick={submit}>
+              {busy ? 'Оформляем…' : 'Создать заявку на закупку'}
             </button>
+
             {report.needs_expert && (
-              <p className="muted small">
+              <p className="tiny muted">
                 Достоверность ниже порога — сначала подтвердите результат на вкладке «Отчёт».
               </p>
             )}
-          </>
+          </div>
         )}
       </div>
-    </>
+    </div>
   )
 }

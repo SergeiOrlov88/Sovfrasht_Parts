@@ -19,30 +19,29 @@ export default function Notifications({ onOpenScan }) {
   if (!data || data.total === 0) return null
 
   return (
-    <div className="notifications">
-      <button className="link" onClick={() => setOpen(v => !v)}>
-        Уведомления{data.unread > 0 ? ` · ${data.unread} новых` : ''}
+    <div style={{ padding: '0 var(--pad)' }}>
+      <button className="btn btn--link" onClick={() => setOpen(v => !v)}>
+        Уведомления
+        {data.unread > 0 && <span className="pill pill--info">{data.unread}</span>}
       </button>
 
       {open && (
-        <ul className="list">
+        <div className="notice-list" style={{ marginTop: 8 }}>
           {data.items.map(n => (
-            <li key={n.id} className={n.read_at ? 'read' : ''}>
-              <div>
-                <b>{n.title}</b>
-                <div className="muted small">{n.body}</div>
+            <div key={n.id} className={`notice${n.read_at ? ' is-read' : ''}`}>
+              <div className="grow">
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{n.title}</div>
+                {n.body && <div className="tiny">{n.body}</div>}
               </div>
-              <div className="row">
-                {n.payload?.scan_id && (
-                  <button className="btn small" onClick={async () => {
-                    if (!n.read_at) { await readNotification(n.id); await load() }
-                    onOpenScan(n.payload.scan_id)
-                  }}>Открыть</button>
-                )}
-              </div>
-            </li>
+              {n.payload?.scan_id && (
+                <button className="btn btn--ghost btn--sm" onClick={async () => {
+                  if (!n.read_at) { await readNotification(n.id); await load() }
+                  onOpenScan(n.payload.scan_id)
+                }}>Открыть</button>
+              )}
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   )

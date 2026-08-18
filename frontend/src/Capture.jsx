@@ -1,7 +1,9 @@
 // Экран съёмки — первый шаг пользователя (A1, FR-CAP-01..04).
-// Вёрстка по целевому макету capture_screen_target.html: шильдик — крупный
-// главный слот с видоискателем, «деталь целиком» и «место установки» —
-// компактные второстепенные слоты в ряд, внизу одна заметная кнопка.
+// Вёрстка по эталонному макету design_ref3.html: шильдик — крупный слот с
+// рамкой-видоискателем, отметкой «обязательно» и кнопкой-затвором; «деталь
+// целиком» и «место установки» — два компактных слота в ряд; внизу одна
+// кнопка «Распознать деталь».
+// Состояния экрана: пусто → кадры готовы → идёт распознавание → ошибка.
 //
 // Два способа получить снимок:
 //   1) input[capture="environment"] — открывает камеру на телефоне и работает
@@ -11,19 +13,22 @@
 //      кнопку не показываем и честно объясняем почему.
 import { useEffect, useRef, useState } from 'react'
 import { createScan, getScan } from './api'
+import { BannerError } from './icons.jsx'
 
 // Второстепенные кадры. Шильдик описан отдельно — он главный, по нему OCR.
 const EXTRA_SLOTS = [
-  { kind: 'overview', title: 'Деталь целиком', hint: 'Помогает определить тип', icon: '⚙️' },
-  { kind: 'context', title: 'Место установки', hint: 'Необязательно', icon: '📍' },
+  { kind: 'overview', title: 'Деталь целиком', hint: 'по возможности' },
+  { kind: 'context', title: 'Место установки', hint: 'контекст' },
 ]
 
-const STAGES = [
-  { key: 'upload', label: 'Загрузка фото' },
-  { key: 'queued', label: 'Принято в обработку' },
-  { key: 'processing', label: 'Распознавание: OCR шильдика' },
-  { key: 'done', label: 'Сопоставление с каталогом' },
+// Шаги распознавания. Индекс текущего считаем от статуса скана.
+const STEPS = [
+  'Кадры загружены',
+  'Читаем маркировку шильдика…',
+  'Сверяем с каталогом закупки',
 ]
+
+const stepIndex = (status) => (status === 'done' || status === 'needs_review' ? 2 : 1)
 
 const cameraSupported = () =>
   typeof navigator !== 'undefined' &&
@@ -55,6 +60,13 @@ function FilePicker({ kind, inputs, onPick }) {
     />
   )
 }
+
+/** Уголки рамки-видоискателя. Четыре span — как в макете. */
+const Corners = () => (
+  <div className="slot-corners" aria-hidden="true">
+    <span /><span /><span /><span />
+  </div>
+)
 
 /** Живой предпросмотр камеры прямо в рамке видоискателя. */
 function LiveCamera({ onShot, onClose }) {
@@ -101,25 +113,25 @@ function LiveCamera({ onShot, onClose }) {
 
   if (error) {
     return (
-      <>
-        <p className="error">{error}</p>
-        <button className="btn ghost" onClick={onClose}>Закрыть</button>
-      </>
+      <div className="stack">
+        <div className="banner banner--danger">
+          <BannerError />
+          <div><b>Камера не открылась</b>{error}</div>
+        </div>
+        <button className="btn btn--ghost btn--block btn--sm" onClick={onClose}>Закрыть</button>
+      </div>
     )
   }
 
   return (
-    <>
-      <div className="vf live">
-        <video ref={videoRef} autoPlay playsInline muted />
-        <div className="corner tl" /><div className="corner tr" />
-        <div className="corner bl" /><div className="corner br" />
+    <div className="live-camera">
+      <video ref={videoRef} autoPlay playsInline muted />
+      <Corners />
+      <div className="btn-row">
+        <button className="btn btn--primary btn--sm" onClick={shoot}>Снять</button>
+        <button className="btn btn--ghost btn--sm" onClick={onClose}>Отмена</button>
       </div>
-      <div className="btnrow">
-        <button className="btn" onClick={shoot}>Снять</button>
-        <button className="btn ghost" onClick={onClose}>Отмена</button>
-      </div>
-    </>
+    </div>
   )
 }
 
@@ -154,10 +166,13 @@ export default function Capture({ user, onReady, onOpenById }) {
     })
   }
 
+  const pick = (kind) => fileInputs.current[kind]?.click()
+
   const order = ['nameplate', ...EXTRA_SLOTS.map(s => s.kind)]
   const taken = order.filter(k => shots[k])
   const nameplate = shots.nameplate
-  const canSend = Boolean(nameplate) && vesselId && !scanId
+  const busy = Boolean(scanId)
+  const canSend = Boolean(nameplate) && vesselId && !busy
 
   async function send() {
     setError('')
@@ -200,38 +215,21 @@ export default function Capture({ user, onReady, onOpenById }) {
     return () => { stop = true }
   }, [scanId])
 
-  // ── Экран прогресса ────────────────────────────────────────────────────────
-  if (scanId) {
-    const current = status === 'queued' ? 1 : status === 'processing' ? 2 : 3
-    return (
-      <section className="report">
-        <h1>Распознаём деталь</h1>
-        <p className="lead">Обычно занимает несколько секунд. Отчёт откроется сам.</p>
-        <div className="card">
-          <ol className="stages">
-            {STAGES.map((st, i) => (
-              <li key={st.key} className={i < current ? 'done' : i === current ? 'active' : ''}>
-                <span className="dot" />
-                {st.label}
-              </li>
-            ))}
-          </ol>
-          {error && <p className="error">{error}</p>}
-        </div>
-      </section>
-    )
-  }
+  const current = stepIndex(status)
 
-  // ── Экран съёмки ───────────────────────────────────────────────────────────
   return (
-    <section className="report">
-      <h1>Новый скан детали</h1>
-      <p className="lead">
-        Сфотографируйте деталь — система определит её и подберёт варианты закупки и ремонта.
-      </p>
+    <div className="screen-body">
+      <div className="page-head">
+        <div className="kicker">Новая заявка · ЦМО</div>
+        <h1>Съёмка детали</h1>
+        <p>
+          Сначала шильдик — по нему читаем номер. Затем деталь целиком и место,
+          если есть доступ.
+        </p>
+      </div>
 
       {user.vessels?.length > 1 && (
-        <div className="card">
+        <div className="field">
           <label htmlFor="vessel">Судно</label>
           <select id="vessel" value={vesselId} onChange={e => setVesselId(e.target.value)}>
             {user.vessels.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
@@ -239,64 +237,63 @@ export default function Capture({ user, onReady, onOpenById }) {
         </div>
       )}
 
-      {/* Главный слот: шильдик. Крупный, с рамкой-видоискателем */}
-      <div className="hero">
-        <span className="req">обязательно</span>
-        <h3>📛 Шильдик</h3>
-        <p>Главный кадр. Снимите табличку с номером крупно, чтобы буквы читались.</p>
+      {/* ── Главный слот: шильдик ─────────────────────────────────────────── */}
+      {liveFor === 'nameplate' ? (
+        <LiveCamera onShot={f => attach('nameplate', f)} onClose={() => setLiveFor(null)} />
+      ) : (
+        <div className={`capture-slot capture-slot--primary${nameplate ? ' is-filled' : ''}`}>
+          <Corners />
+          <span className="slot-req">обязательно</span>
+          <FilePicker kind="nameplate" inputs={fileInputs} onPick={attach} />
 
-        {liveFor === 'nameplate' ? (
-          <LiveCamera onShot={f => attach('nameplate', f)} onClose={() => setLiveFor(null)} />
-        ) : (
-          <>
-            <div className={`vf${nameplate ? ' shot' : ''}`}>
-              {nameplate ? (
-                <img src={nameplate.url} alt="Шильдик" />
-              ) : (
-                <div className="ico">🔎</div>
-              )}
-              <div className="corner tl" /><div className="corner tr" />
-              <div className="corner bl" /><div className="corner br" />
+          {nameplate ? (
+            <div className="slot-preview">
+              <img src={nameplate.url} alt="Шильдик" />
+              <button className="recapture recapture--left" onClick={() => drop('nameplate')}>
+                Убрать
+              </button>
+              <button className="recapture" onClick={() => pick('nameplate')}>Переснять</button>
             </div>
-
-            <FilePicker kind="nameplate" inputs={fileInputs} onPick={attach} />
-            <button className="btn" onClick={() => fileInputs.current.nameplate?.click()}>
-              📷 {nameplate ? 'Переснять шильдик' : 'Сфотографировать шильдик'}
-            </button>
-
-            <div className="btnrow" style={{ marginTop: 10 }}>
+          ) : (
+            <div className="slot-empty">
+              <div className="slot-title">Шильдик</div>
+              <div className="slot-sub">Держите табличку в рамке. Вспышка лучше, чем тень.</div>
+              <button className="shutter" type="button" onClick={() => pick('nameplate')}>
+                <span className="shutter-dot" /> Сфотографировать
+              </button>
               {cameraSupported() && (
-                <button className="btn ghost small" onClick={() => setLiveFor('nameplate')}>
-                  Камера с рамкой
-                </button>
-              )}
-              {nameplate && (
-                <button className="btn ghost small" onClick={() => drop('nameplate')}>
-                  Убрать кадр
-                </button>
+                <div style={{ marginTop: 10 }}>
+                  <button className="btn btn--link" onClick={() => setLiveFor('nameplate')}>
+                    Камера с рамкой
+                  </button>
+                </div>
               )}
             </div>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
-      {/* Второстепенные кадры — компактно, в один ряд */}
-      <div className="row2">
+      {/* ── Второстепенные кадры ──────────────────────────────────────────── */}
+      <div className="slot-grid">
         {EXTRA_SLOTS.map(slot => {
           const shot = shots[slot.kind]
           return (
-            <div className="slot" key={slot.kind}>
-              <div className="ph">
-                {shot ? <img src={shot.url} alt={slot.title} /> : slot.icon}
-              </div>
-              <h4>{slot.title}</h4>
-              <small>{slot.hint}</small>
+            <div key={slot.kind}
+              className={`capture-slot capture-slot--sec${shot ? ' is-filled' : ''}`}>
               <FilePicker kind={slot.kind} inputs={fileInputs} onPick={attach} />
               {shot ? (
-                <button className="add drop" onClick={() => drop(slot.kind)}>× убрать</button>
+                <div className="slot-preview">
+                  <img src={shot.url} alt={slot.title} />
+                  <button className="recapture recapture--left" onClick={() => drop(slot.kind)}>
+                    Убрать
+                  </button>
+                  <button className="recapture" onClick={() => pick(slot.kind)}>Переснять</button>
+                </div>
               ) : (
-                <button className="add" onClick={() => fileInputs.current[slot.kind]?.click()}>
-                  ＋ добавить
+                <button className="slot-empty slot-empty--fill" type="button"
+                  onClick={() => pick(slot.kind)}>
+                  <span className="slot-title">{slot.title}</span>
+                  <span className="slot-sub">{slot.hint}</span>
                 </button>
               )}
             </div>
@@ -304,23 +301,57 @@ export default function Capture({ user, onReady, onOpenById }) {
         })}
       </div>
 
-      {error && <p className="error">{error}</p>}
-
-      <button className={`btn cta${canSend ? '' : ' disabled'}`} disabled={!canSend} onClick={send}>
-        {nameplate ? `Распознать деталь${taken.length > 1 ? ` · ${taken.length} фото` : ''}`
-                   : 'Сначала снимите шильдик'}
+      <button className="btn btn--primary btn--block" type="button"
+        disabled={!canSend} onClick={send}>
+        Распознать деталь{taken.length > 1 ? ` · ${taken.length} фото` : ''}
       </button>
 
-      <div className="hint">
+      {/* Отключённая кнопка обязана объяснять причину */}
+      {!nameplate && !busy && (
+        <p className="tiny muted">
+          Нужен хотя бы снимок шильдика — без него OCR не запустится.
+        </p>
+      )}
+
+      {/* ── Идёт распознавание: сканер, скелетон и шаги ───────────────────── */}
+      {busy && (
+        <>
+          <div className="panel scan-panel">
+            <div className="scan-line" />
+            <div className="skeleton sk-title" />
+            <div className="skeleton sk-line" style={{ width: '88%' }} />
+            <div className="skeleton sk-line" style={{ width: '64%' }} />
+            <div className="skeleton sk-block" />
+          </div>
+          <div className="progress-steps">
+            {STEPS.map((label, i) => (
+              <div key={label}
+                className={`pstep${i < current ? ' is-done' : i === current ? ' is-run' : ''}`}>
+                <span className="dot" />{label}
+              </div>
+            ))}
+          </div>
+          <p className="tiny muted">Обычно занимает несколько секунд. Отчёт откроется сам.</p>
+        </>
+      )}
+
+      {error && (
+        <div className="banner banner--danger">
+          <BannerError />
+          <div><b>Не удалось начать распознавание</b>{error}</div>
+        </div>
+      )}
+
+      <p className="tiny muted">
         На телефоне кнопка откроет камеру, на компьютере — выбор файла.
         {cameraSupported()
           ? ' Живой предпросмотр с рамкой доступен.'
           : ' Живой предпросмотр с рамкой доступен по HTTPS.'}
-      </div>
+      </p>
 
-      <button className="byid" onClick={onOpenById}>
-        Уже есть скан? <u>Открыть по id</u>
+      <button className="btn btn--link" style={{ justifyContent: 'center' }} onClick={onOpenById}>
+        Уже есть скан? Открыть по id
       </button>
-    </section>
+    </div>
   )
 }

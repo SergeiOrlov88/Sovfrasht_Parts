@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a1420" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Совфрахт Детали — макет PWA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a1420;
+      --bg-elev: #0c1826;
+      --panel: #132639;
+      --panel2: #18324a;
+      --panel3: #1d3c58;
+      --line: #22405c;
+      --line2: #2c5476;
+      --ink: #eaf2fb;
+      --ink-soft: #c9d8e8;
+      --mut: #8aa6c2;
+      --acc: #2fc4a3;
+      --acc-ink: #04241c;
+      --acc-dim: rgba(47, 196, 163, 0.16);
+      --acc-glow: rgba(47, 196, 163, 0.28);
+      --acc2: #38b6ff;
+      --acc2-dim: rgba(56, 182, 255, 0.16);
+      --warn: #f0a341;
+      --warn-ink: #2a1a04;
+      --warn-dim: rgba(240, 163, 65, 0.16);
+      --danger: #ff5d73;
+      --danger-dim: rgba(255, 93, 115, 0.14);
+
+      --s-2: 8px;
+      --s-3: 12px;
+      --s-4: 16px;
+      --s-5: 20px;
+      --s-6: 24px;
+      --touch: 48px;
+      --touch-lg: 56px;
+
+      --radius-sm: 12px;
+      --radius: 16px;
+      --radius-lg: 20px;
+
+      --app-max: 480px;
+      --pad: 16px;
+      --font: "Manrope", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+      --shadow-panel: 0 12px 40px rgba(0, 0, 0, 0.28);
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      color: var(--ink);
+      background: var(--bg);
+      min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font-family: inherit; cursor: pointer; border: 0; background: none; color: inherit; }
+    h1, h2, h3, p, figure { margin: 0; }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background:
+        radial-gradient(900px 480px at 50% -10%, rgba(56, 182, 255, 0.08), transparent 60%),
+        radial-gradient(700px 420px at 80% 110%, rgba(47, 196, 163, 0.06), transparent 55%),
+        linear-gradient(rgba(34, 64, 92, 0.22) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 64, 92, 0.22) 1px, transparent 1px);
+      background-size: auto, auto, 40px 40px, 40px 40px;
+    }
+
+    .proto-nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(10, 20, 32, 0.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--line);
+    }
+    .proto-nav-inner { max-width: 1280px; margin: 0 auto; padding: 10px 16px 12px; }
+    .proto-kicker {
+      display: flex; justify-content: space-between; gap: 12px;
+      margin-bottom: 8px; color: var(--mut);
+      font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .proto-kicker b { color: var(--acc); }
+    .proto-tabs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+    .proto-tabs::-webkit-scrollbar { display: none; }
+    .proto-tab {
+      flex: 0 0 auto; height: 36px; padding: 0 12px;
+      border-radius: 999px; border: 1px solid var(--line);
+      background: var(--panel); color: var(--mut);
+      font-size: 13px; font-weight: 600;
+    }
+    .proto-tab.is-active { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
+
+    .stage {
+      position: relative; z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr minmax(320px, var(--app-max)) 1fr;
+      gap: 24px;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 20px 16px 32px;
+      align-items: start;
+    }
+    .anno {
+      position: sticky; top: 92px;
+      color: var(--mut); font-size: 13px; line-height: 1.5; padding: 8px 4px;
+    }
+    .anno h3 {
+      color: var(--ink-soft); font-size: 12px; letter-spacing: 0.08em;
+      text-transform: uppercase; margin-bottom: 8px;
+    }
+    .anno.is-right { text-align: right; }
+
+    .device {
+      width: 100%; max-width: var(--app-max); justify-self: center;
+      background: var(--bg-elev);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow-panel);
+      overflow: hidden;
+      min-height: 760px;
+    }
+    .app { min-height: 760px; display: flex; flex-direction: column; }
+    .screen { display: none; flex-direction: column; min-height: 760px; }
+    .screen.is-active { display: flex; }
+    .screen-body {
+      padding: var(--pad);
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+      display: flex; flex-direction: column; gap: 16px; flex: 1;
+    }
+    .screen-body--tight { gap: 12px; }
+
+    .app-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(24, 50, 74, 0.45), transparent);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .brand-mark {
+      width: 36px; height: 36px; flex: 0 0 auto;
+      border-radius: 10px; background: var(--acc-dim);
+      border: 1px solid rgba(47, 196, 163, 0.35);
+      display: grid; place-items: center;
+    }
+    .brand-name { font-weight: 800; font-size: 15px; line-height: 1.15; }
+    .brand-name span {
+      display: block; font-weight: 600; font-size: 11px;
+      color: var(--mut); letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .role-stack { text-align: right; min-width: 0; }
+    .role-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 24px; padding: 0 8px; border-radius: 999px;
+      background: var(--acc-dim); color: var(--acc);
+      font-size: 11px; font-weight: 700;
+    }
+    .role-pill i {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--acc); box-shadow: 0 0 0 3px var(--acc-dim);
+    }
+    .role-sub {
+      margin-top: 4px; font-size: 11px; color: var(--mut);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .page-head h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; }
+    .page-head p { margin-top: 6px; color: var(--mut); font-size: 14px; line-height: 1.45; }
+    .kicker {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--acc2); margin-bottom: 6px;
+    }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: var(--touch-lg); padding: 0 18px;
+      border-radius: var(--radius);
+      font-size: 16px; font-weight: 800;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn--primary {
+      background: var(--acc); color: var(--acc-ink);
+      box-shadow: 0 8px 28px var(--acc-glow);
+    }
+    .btn--primary.is-disabled {
+      background: #1b3a34; color: #5e887c; box-shadow: none; pointer-events: none;
+    }
+    .btn--ghost { background: var(--panel2); color: var(--ink); border: 1px solid var(--line2); }
+    .btn--warn { background: var(--warn); color: var(--warn-ink); }
+    .btn--danger {
+      background: var(--danger-dim); color: #ffd0d6;
+      border: 1px solid rgba(255, 93, 115, 0.35);
+    }
+    .btn--block { width: 100%; }
+    .btn--sm { min-height: 44px; font-size: 14px; border-radius: 12px; }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 24px; padding: 0 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 700;
+      background: var(--panel2); color: var(--mut);
+    }
+    .pill--ok { background: var(--acc-dim); color: var(--acc); }
+    .pill--info { background: var(--acc2-dim); color: var(--acc2); }
+    .pill--warn { background: var(--warn-dim); color: var(--warn); }
+    .pill--danger { background: var(--danger-dim); color: var(--danger); }
+
+    .banner {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 12px 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--line); background: var(--panel2);
+      font-size: 13px; line-height: 1.45; color: var(--ink-soft);
+    }
+    .banner b { display: block; color: var(--ink); margin-bottom: 2px; }
+    .banner--warn { background: var(--warn-dim); border-color: rgba(240,163,65,.35); }
+    .banner--danger { background: var(--danger-dim); border-color: rgba(255,93,115,.35); }
+    .banner--info { background: var(--acc2-dim); border-color: rgba(56,182,255,.3); }
+    .banner--ok { background: var(--acc-dim); border-color: rgba(47,196,163,.3); }
+    .banner-ico { flex: 0 0 auto; width: 20px; height: 20px; }
+
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 14px; }
+    .section-label {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--mut); margin-bottom: 10px;
+    }
+    .mono { font-family: var(--mono); }
+    .muted { color: var(--mut); }
+    .tiny { font-size: 12px; }
+
+    .capture-slot {
+      position: relative; background: var(--panel);
+      border: 1.5px dashed var(--line2); border-radius: var(--radius-lg);
+      overflow: hidden; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; color: var(--mut);
+    }
+    .capture-slot--primary { min-height: 248px; padding: 18px; }
+    .capture-slot--sec { min-height: 118px; padding: 10px; }
+    .capture-slot.is-filled { border-style: solid; border-color: rgba(47, 196, 163, 0.55); }
+    .slot-corners span {
+      position: absolute; width: 22px; height: 22px; border: 2px solid var(--acc);
+    }
+    .slot-corners span:nth-child(1) { top: 10px; left: 10px; border-right: 0; border-bottom: 0; }
+    .slot-corners span:nth-child(2) { top: 10px; right: 10px; border-left: 0; border-bottom: 0; }
+    .slot-corners span:nth-child(3) { bottom: 10px; left: 10px; border-right: 0; border-top: 0; }
+    .slot-corners span:nth-child(4) { bottom: 10px; right: 10px; border-left: 0; border-top: 0; }
+    .slot-req {
+      position: absolute; top: 12px; left: 12px; z-index: 2;
+      background: var(--warn); color: var(--warn-ink);
+      font-size: 10px; font-weight: 800; letter-spacing: 0.06em;
+      padding: 3px 7px; border-radius: 999px;
+    }
+    .slot-title { font-size: 15px; font-weight: 800; color: var(--ink); }
+    .slot-sub { font-size: 12px; margin-top: 4px; }
+    .shutter {
+      margin-top: 14px; min-height: 44px; padding: 0 14px;
+      border-radius: 999px; background: var(--panel2);
+      border: 1px solid var(--line2); color: var(--ink);
+      font-weight: 700; font-size: 13px;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .shutter-dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid var(--ink);
+      box-shadow: inset 0 0 0 3px var(--panel2), inset 0 0 0 7px var(--danger);
+    }
+    .slot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .slot-preview { position: absolute; inset: 0; }
+    .slot-preview .art { width: 100%; height: 100%; }
+    .recapture {
+      position: absolute; right: 10px; bottom: 10px; z-index: 2;
+      height: 32px; padding: 0 10px; border-radius: 999px;
+      background: rgba(10, 20, 32, 0.78); border: 1px solid var(--line);
+      font-size: 12px; font-weight: 700;
+    }
+
+    .confidence-meter { --val: 94; width: 78px; flex: 0 0 auto; text-align: center; }
+    .confidence-meter svg { width: 78px; height: 78px; transform: rotate(-90deg); }
+    .cm-track { fill: none; stroke: var(--panel3); stroke-width: 3.2; }
+    .cm-val { fill: none; stroke: var(--acc); stroke-width: 3.2; stroke-linecap: round; stroke-dasharray: var(--val) 100; }
+    .confidence-meter--mid .cm-val { stroke: var(--warn); }
+    .confidence-meter--low .cm-val { stroke: var(--danger); }
+    .cm-center { margin-top: -62px; margin-bottom: 8px; display: flex; flex-direction: column; align-items: center; }
+    .cm-center b { font-size: 18px; font-weight: 800; }
+    .cm-center b small { font-size: 11px; color: var(--mut); }
+    .cm-center span { font-size: 9px; color: var(--mut); letter-spacing: 0.04em; text-transform: uppercase; }
+
+    .identification-card {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: var(--radius-lg); padding: 16px; position: relative; overflow: hidden;
+    }
+    .identification-card::before {
+      content: ""; position: absolute; left: 0; top: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--acc), var(--acc2));
+    }
+    .id-top { display: flex; gap: 12px; align-items: flex-start; }
+    .id-top h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; }
+    .id-type { margin-top: 4px; color: var(--acc2); font-size: 13px; font-weight: 700; }
+    .id-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; margin-top: 14px; }
+    .id-field span { display: block; font-size: 11px; color: var(--mut); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 3px; }
+    .id-field b { font-size: 13px; font-weight: 700; line-height: 1.35; }
+    .id-mark { margin-top: 12px; background: #0c1c2b; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+    .id-mark span { display: block; font-size: 11px; color: var(--mut); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .id-mark code { font-family: var(--mono); font-size: 14px; color: var(--acc); }
+    .id-caveat { margin-top: 12px; font-size: 12px; color: var(--mut); line-height: 1.45; }
+
+    .tab-bar {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 14px; padding: 4px; gap: 4px;
+    }
+    .tab-bar button { min-height: 40px; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--mut); }
+    .tab-bar button.is-active { background: var(--panel3); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line2); }
+    .tab-panel { display: none; }
+    .tab-panel.is-active { display: flex; flex-direction: column; gap: 10px; }
+
+    .supplier-row {
+      display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center;
+      padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    }
+    .supplier-row.is-best { border-color: rgba(47, 196, 163, 0.45); }
+    .sup-logo {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: grid; place-items: center; background: var(--panel2); color: var(--acc2);
+      font-weight: 800; font-size: 12px;
+    }
+    .sup-name { font-weight: 700; font-size: 14px; }
+    .sup-meta { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .sup-price { text-align: right; }
+    .sup-price b { display: block; font-size: 16px; font-weight: 800; }
+    .sup-price span { font-size: 11px; color: var(--mut); }
+
+    .repair-verdict {
+      background: linear-gradient(180deg, rgba(240,163,65,.12), transparent 42%), var(--panel);
+      border: 1px solid rgba(240,163,65,.35); border-radius: var(--radius-lg); padding: 16px;
+    }
+    .verdict-stamp {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border: 2px solid var(--warn); color: var(--warn);
+      border-radius: 8px; font-weight: 800; letter-spacing: 0.08em;
+      text-transform: uppercase; transform: rotate(-2deg); margin-bottom: 10px;
+    }
+    .repair-verdict h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+    .compare-col { background: #0c1c2b; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+    .compare-col.is-pick { border-color: var(--warn); }
+    .compare-col h3 { font-size: 12px; color: var(--mut); text-transform: uppercase; letter-spacing: 0.05em; }
+    .compare-col b { display: block; margin-top: 6px; font-size: 18px; }
+    .compare-col ul { margin: 8px 0 0; padding-left: 16px; color: var(--mut); font-size: 12px; line-height: 1.45; }
+    .disclaimer {
+      margin-top: 14px; padding: 12px; border-radius: 12px;
+      background: #140f0a; border: 1px dashed rgba(240,163,65,.4);
+      font-size: 12px; line-height: 1.5; color: #e6d3b2;
+    }
+    .disclaimer strong { display: block; margin-bottom: 4px; color: var(--warn); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+
+    .moderation-task-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+    .mtc-photos { display: grid; grid-template-columns: 1.3fr 1fr 1fr; height: 110px; }
+    .mtc-photos div { background: #0c1c2b; border-right: 1px solid var(--line); position: relative; overflow: hidden; }
+    .mtc-photos div:last-child { border-right: 0; }
+    .mtc-photos label {
+      position: absolute; left: 6px; bottom: 6px;
+      font-size: 10px; font-weight: 700; color: var(--ink);
+      background: rgba(10,20,32,.7); padding: 2px 6px; border-radius: 6px;
+    }
+    .mtc-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+    .candidate {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: #0f2030;
+    }
+    .candidate.is-pick { border-color: var(--acc); background: var(--acc-dim); }
+    .radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line2); flex: 0 0 auto; margin-top: 2px; }
+    .candidate.is-pick .radio { border-color: var(--acc); box-shadow: inset 0 0 0 4px var(--acc); }
+
+    .empty-state { text-align: center; padding: 36px 16px; color: var(--mut); }
+    .empty-ico {
+      width: 72px; height: 72px; margin: 0 auto 14px; border-radius: 50%;
+      display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line);
+    }
+    .empty-state h2 { color: var(--ink); font-size: 18px; margin-bottom: 6px; }
+
+    .skeleton { background: var(--panel2); border-radius: 10px; position: relative; overflow: hidden; }
+    .skeleton::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(234,242,251,.06), transparent);
+      animation: shimmer 1.4s infinite;
+    }
+    .sk-line { height: 12px; margin-bottom: 8px; }
+    .sk-title { height: 22px; width: 70%; margin-bottom: 12px; }
+    .sk-block { height: 84px; }
+
+    .progress-steps { display: flex; flex-direction: column; gap: 8px; }
+    .pstep { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--mut); }
+    .pstep.is-done { color: var(--acc); }
+    .pstep.is-run { color: var(--ink); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line2); flex: 0 0 auto; }
+    .pstep.is-done .dot { background: var(--acc); }
+    .pstep.is-run .dot { background: var(--acc2); box-shadow: 0 0 0 4px var(--acc2-dim); animation: pulse 1.2s infinite; }
+    .scan-line {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--acc), transparent);
+      animation: scan 1.8s var(--ease) infinite;
+      box-shadow: 0 0 12px var(--acc);
+    }
+
+    .task-row {
+      display: grid; grid-template-columns: 1fr auto; gap: 8px;
+      padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    }
+    .task-row h3 { font-size: 14px; font-weight: 700; }
+    .codes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .code-cell { background: #0c1c2b; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+    .code-cell span { display: block; font-size: 11px; color: var(--mut); margin-bottom: 4px; }
+    .code-cell b { font-family: var(--mono); font-size: 14px; color: var(--acc2); }
+    .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+    .stat b { display: block; font-size: 20px; font-weight: 800; }
+    .stat span { font-size: 11px; color: var(--mut); }
+
+    .role-switch {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 14px; padding: 4px;
+    }
+    .role-switch button { min-height: 40px; border-radius: 10px; font-size: 12px; font-weight: 700; color: var(--mut); }
+    .role-switch button.is-active { background: var(--panel3); color: var(--ink); }
+    .role-view { display: none; }
+    .role-view.is-active { display: flex; flex-direction: column; gap: 10px; }
+
+    .photo-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .photo-strip figure {
+      margin: 0; background: #0c1c2b; border: 1px solid var(--line);
+      border-radius: 12px; overflow: hidden; height: 78px; position: relative;
+    }
+    .photo-strip figcaption {
+      position: absolute; left: 6px; bottom: 6px;
+      font-size: 10px; font-weight: 700;
+      background: rgba(10,20,32,.72); padding: 2px 6px; border-radius: 6px;
+    }
+
+    .handoff { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto 48px; padding: 0 16px; color: var(--ink-soft); font-size: 13px; line-height: 1.55; }
+    .handoff-box { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 20px; }
+    .handoff h2 { font-size: 16px; margin: 0 0 10px; }
+    .handoff h3 { font-size: 13px; color: var(--acc); margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .handoff ul { margin: 0; padding-left: 18px; }
+    .handoff code { font-family: var(--mono); font-size: 12px; color: var(--acc2); }
+
+    .state-stack { display: flex; flex-direction: column; gap: 16px; }
+    .state-block { border-top: 1px dashed var(--line); padding-top: 14px; }
+    .state-block:first-child { border-top: 0; padding-top: 0; }
+
+    @keyframes shimmer { from { transform: translateX(-60%); } to { transform: translateX(60%); } }
+    @keyframes pulse { 50% { opacity: .45; } }
+    @keyframes scan { from { top: 8%; } to { top: 88%; } }
+
+    @media (max-width: 960px) {
+      .anno { display: none; }
+      .stage { grid-template-columns: 1fr; padding: 12px 12px 32px; }
+      .device { border-radius: 20px; min-height: calc(100dvh - 120px); }
+      .app, .screen { min-height: calc(100dvh - 120px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="proto-nav" aria-label="Переключение макетов">
+    <div class="proto-nav-inner">
+      <div class="proto-kicker">
+        <span>Макет PWA · <b>Совфрахт Детали</b></span>
+        <span>не часть приложения</span>
+      </div>
+      <div class="proto-tabs" role="tablist">
+        <button class="proto-tab is-active" data-screen="capture">Съёмка</button>
+        <button class="proto-tab" data-screen="report">Отчёт</button>
+        <button class="proto-tab" data-screen="missing">Нет в каталоге</button>
+        <button class="proto-tab" data-screen="purchase">Закупка</button>
+        <button class="proto-tab" data-screen="repair">Ремонт</button>
+        <button class="proto-tab" data-screen="expert">Эксперт</button>
+        <button class="proto-tab" data-screen="landing">Лендинг</button>
+        <button class="proto-tab" data-screen="states">Состояния</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="stage">
+    <aside class="anno" id="anno-left"></aside>
+
+    <div class="device">
+      <div class="app">
+
+        <!-- CaptureScreen -->
+        <section class="screen is-active" id="screen-capture" data-screen="capture"
+          data-note-left="Роль: механик. Контекст ЦМО — перчатки, масло, плохой свет. Шильдик обязателен и крупнее остальных слотов."
+          data-note-right="Компоненты: AppBar, CaptureSlot ×3, Button. Состояния слота: empty / filled. CTA неактивна без шильдика.">
+          <header class="app-bar">
+            <div class="brand">
+              <div class="brand-mark" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.2" stroke="#2fc4a3" stroke-width="1.6"/><path d="M10 4.2v11.6M4.2 10h11.6" stroke="#38b6ff" stroke-width="1.2"/><circle cx="10" cy="10" r="2.1" fill="#2fc4a3"/></svg>
+              </div>
+              <div class="brand-name">Совфрахт<span>Детали</span></div>
+            </div>
+            <div class="role-stack">
+              <div class="role-pill"><i></i> Механик</div>
+              <div class="role-sub">т/х «Северный ветер»</div>
+            </div>
+          </header>
+          <div class="screen-body">
+            <div class="page-head">
+              <div class="kicker">Новая заявка · ЦМО</div>
+              <h1>Съёмка детали</h1>
+              <p>Сначала шильдик — по нему читаем номер. Затем деталь целиком и место, если есть доступ.</p>
+            </div>
+
+            <div class="capture-slot capture-slot--primary" id="slot-plate" data-slot>
+              <div class="slot-corners" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+              <span class="slot-req">обязательно</span>
+              <div class="slot-empty">
+                <div class="slot-title">Шильдик</div>
+                <div class="slot-sub">Держите табличку в рамке. Вспышка лучше, чем тень.</div>
+                <button class="shutter" type="button"><span class="shutter-dot"></span> Сфотографировать</button>
+              </div>
+              <div class="slot-preview" hidden>
+                <svg class="art" viewBox="0 0 360 220" preserveAspectRatio="xMidYMid slice" aria-label="Превью шильдика Bosch">
+                  <defs><linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8ea0b0"/><stop offset="1" stop-color="#4d5d6c"/></linearGradient></defs>
+                  <rect width="360" height="220" fill="#1a140e"/>
+                  <rect x="28" y="24" width="304" height="172" rx="6" fill="url(#metal)"/>
+                  <rect x="36" y="32" width="288" height="156" rx="3" fill="#c5cdd4"/>
+                  <text x="52" y="62" font-family="Manrope" font-size="18" font-weight="800" fill="#1a1f24">BOSCH</text>
+                  <text x="52" y="84" font-family="IBM Plex Mono" font-size="9" fill="#3c4650">COMMON RAIL HIGH PRESSURE PUMP</text>
+                  <text x="52" y="112" font-family="IBM Plex Mono" font-size="16" font-weight="600" fill="#111">CP3.4  ·  0 445 020 073</text>
+                  <text x="52" y="136" font-family="IBM Plex Mono" font-size="11" fill="#222">S/N 1847293   12/2019   MADE IN GERMANY</text>
+                  <text x="52" y="164" font-family="IBM Plex Mono" font-size="9" fill="#445">PN 0445020073  ·  200–1800 bar</text>
+                  <circle cx="300" cy="56" r="10" fill="#9aa6b0" stroke="#6b7680"/>
+                  <circle cx="300" cy="164" r="10" fill="#9aa6b0" stroke="#6b7680"/>
+                </svg>
+                <button class="recapture" type="button">Переснять</button>
+              </div>
+            </div>
+
+            <div class="slot-grid">
+              <div class="capture-slot capture-slot--sec" id="slot-part" data-slot>
+                <div class="slot-empty">
+                  <div class="slot-title">Деталь целиком</div>
+                  <div class="slot-sub">по возможности</div>
+                </div>
+                <div class="slot-preview" hidden>
+                  <svg class="art" viewBox="0 0 180 120" preserveAspectRatio="xMidYMid slice">
+                    <rect width="180" height="120" fill="#121820"/>
+                    <rect x="30" y="38" width="120" height="48" rx="8" fill="#3a4a58"/>
+                    <rect x="18" y="50" width="28" height="24" rx="4" fill="#2fc4a3"/>
+                    <circle cx="142" cy="62" r="16" fill="#5a6a78"/>
+                    <rect x="54" y="28" width="18" height="14" fill="#38b6ff"/>
+                  </svg>
+                  <button class="recapture" type="button">Переснять</button>
+                </div>
+              </div>
+              <div class="capture-slot capture-slot--sec" id="slot-place" data-slot>
+                <div class="slot-empty">
+                  <div class="slot-title">Место установки</div>
+                  <div class="slot-sub">контекст</div>
+                </div>
+                <div class="slot-preview" hidden>
+                  <svg class="art" viewBox="0 0 180 120" preserveAspectRatio="xMidYMid slice">
+                    <rect width="180" height="120" fill="#0e1822"/>
+                    <rect x="16" y="20" width="148" height="80" fill="none" stroke="#22405c"/>
+                    <path d="M24 88h132M40 88V36h28v52M96 88V48h40v40" stroke="#38b6ff" stroke-width="2"/>
+                    <circle cx="110" cy="62" r="7" fill="#f0a341"/>
+                  </svg>
+                  <button class="recapture" type="button">Переснять</button>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn--primary btn--block is-disabled" id="btn-recognize" type="button">Распознать деталь</button>
+            <p class="tiny muted" id="capture-hint">Нужен хотя бы снимок шильдика — без него OCR не запустится.</p>
+          </div>
+        </section>
+
+        <!-- ReportScreen: in catalog -->
+        <section class="screen" id="screen-report" data-screen="report"
+          data-note-left="Главный экран механика после распознавания. Опознание всегда сверху — склад и ремонт вторичны."
+          data-note-right="Компоненты: IdentificationCard, ConfidenceMeter, TabBar, SupplierRow. Состояние: деталь есть в каталоге, 94%.">
+          <header class="app-bar">
+            <div class="brand">
+              <div class="brand-mark" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.2" stroke="#2fc4a3" stroke-width="1.6"/><path d="M10 4.2v11.6M4.2 10h11.6" stroke="#38b6ff" stroke-width="1.2"/><circle cx="10" cy="10" r="2.1" fill="#2fc4a3"/></svg>
+              </div>
+              <div class="brand-name">Совфрахт<span>Детали</span></div>
+            </div>
+            <div class="role-stack">
+              <div class="role-pill"><i></i> Механик</div>
+              <div class="role-sub">SF-24081 · 18.08.2026</div>
+            </div>
+          </header>
+          <div class="screen-body screen-body--tight">
+            <article class="identification-card">
+              <div class="id-top">
+                <div style="flex:1;min-width:0">
+                  <div class="kicker">Опознание</div>
+                  <h2>Насос топливный высокого давления</h2>
+                  <div class="id-type">Топливная аппаратура · ТНВД / common rail</div>
+                </div>
+                <div class="confidence-meter" style="--val:94">
+                  <svg viewBox="0 0 36 36" aria-hidden="true">
+                    <circle class="cm-track" cx="18" cy="18" r="15.5" pathLength="100"/>
+                    <circle class="cm-val" cx="18" cy="18" r="15.5" pathLength="100"/>
+                  </svg>
+                  <div class="cm-center"><b>94<small>%</small></b><span>уверенность</span></div>
+                </div>
+              </div>
+              <div class="id-grid">
+                <div class="id-field"><span>Производитель</span><b>Robert Bosch GmbH</b></div>
+                <div class="id-field"><span>Модель</span><b>CP3.4</b></div>
+                <div class="id-field"><span>Назначение</span><b>Нагнетание топлива в рампу ГД</b></div>
+                <div class="id-field"><span>Узел</span><b>Топливная аппаратура, левый борт</b></div>
+              </div>
+              <div class="id-mark">
+                <span>Прочитанная маркировка</span>
+                <code>0 445 020 073  ·  S/N 1847293  ·  12/2019</code>
+              </div>
+              <p class="id-caveat">Оговорка: шильдик под масляной плёнкой. Последние 2 символа серийника восстановлены по контуру штампа.</p>
+            </article>
+
+            <div class="tab-bar" data-tabs="report-found">
+              <button type="button" class="is-active" data-panel="rf-report">Отчёт</button>
+              <button type="button" data-panel="rf-buy">Закупка</button>
+              <button type="button" data-panel="rf-fix">Ремонт</button>
+            </div>
+
+            <div class="tab-panel is-active" id="rf-report">
+              <div class="banner banner--ok">
+                <svg class="banner-ico" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#2fc4a3"/><path d="M6 10.2l2.4 2.4L14 7.4" stroke="#2fc4a3" stroke-width="1.6"/></svg>
+                <div><b>Есть в каталоге закупки Совфрахт</b>Сопоставлено с карточкой IMPA 59.12.15 · оригинал Bosch.</div>
+              </div>
+              <div class="codes">
+                <div class="code-cell"><span>IMPA</span><b>59.12.15</b></div>
+                <div class="code-cell"><span>OEM / Bosch</span><b>0 445 020 073</b></div>
+                <div class="code-cell"><span>ISSA</span><b>59.081.15</b></div>
+                <div class="code-cell"><span>Внутр. код</span><b>SF-FA-CP34</b></div>
+              </div>
+              <div class="section-label"><span>Снимки</span><span>3 кадра</span></div>
+              <div class="photo-strip">
+                <figure>
+                  <svg viewBox="0 0 120 78" preserveAspectRatio="xMidYMid slice"><rect width="120" height="78" fill="#1a140e"/><rect x="12" y="14" width="96" height="50" fill="#c5cdd4"/><text x="20" y="42" font-size="8" fill="#111">BOSCH CP3.4</text></svg>
+                  <figcaption>Шильдик</figcaption>
+                </figure>
+                <figure>
+                  <svg viewBox="0 0 120 78"><rect width="120" height="78" fill="#121820"/><rect x="20" y="26" width="80" height="28" rx="6" fill="#3a4a58"/></svg>
+                  <figcaption>Деталь</figcaption>
+                </figure>
+                <figure>
+                  <svg viewBox="0 0 120 78"><rect width="120" height="78" fill="#0e1822"/><path d="M16 60h88M28 60V24h20v36" stroke="#38b6ff" fill="none"/></svg>
+                  <figcaption>Место</figcaption>
+                </figure>
+              </div>
+              <div class="section-label"><span>Поставщики · кратко</span></div>
+              <article class="supplier-row is-best">
+                <div class="sup-logo">WSS</div>
+                <div>
+                  <div class="sup-name">Wilhelmsen Ships Service</div>
+                  <div class="sup-meta"><span class="pill pill--ok">на складе Роттердам</span><span class="pill">7 сут.</span></div>
+                </div>
+                <div class="sup-price"><b>1 840 €</b><span>оригинал</span></div>
+              </article>
+            </div>
+
+            <div class="tab-panel" id="rf-buy">
+              <article class="supplier-row is-best">
+                <div class="sup-logo">WSS</div>
+                <div>
+                  <div class="sup-name">Wilhelmsen Ships Service</div>
+                  <div class="sup-meta"><span class="pill pill--ok">на складе</span><span class="pill">7 сут. CIF СПб</span></div>
+                </div>
+                <div class="sup-price"><b>1 840 €</b><span>оригинал Bosch</span></div>
+              </article>
+              <article class="supplier-row">
+                <div class="sup-logo">MSK</div>
+                <div>
+                  <div class="sup-name">MSK Shipspares</div>
+                  <div class="sup-meta"><span class="pill pill--info">под заказ</span><span class="pill">14–18 сут.</span></div>
+                </div>
+                <div class="sup-price"><b>1 620 €</b><span>оригинал</span></div>
+              </article>
+              <button class="btn btn--primary btn--block btn--sm" type="button">Открыть закупку</button>
+            </div>
+
+            <div class="tab-panel" id="rf-fix">
+              <div class="repair-verdict">
+                <div class="verdict-stamp">замена</div>
+                <h2>Рекомендуем заменить, не ремонтировать</h2>
+                <p class="tiny muted" style="margin-top:6px">Плунжерная пара изношена. Ремонт ТНВД CP3 на судне не восстанавливает ресурс.</p>
+              </div>
+              <button class="btn btn--ghost btn--block btn--sm" type="button">Открыть полный вердикт</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ReportScreen: not in catalog + low confidence -->
+        <section class="screen" id="screen-missing" data-screen="missing"
+          data-note-left="Два отдельных кейса: опознана, но нет в каталоге; и низкая достоверность → эксперт."
+          data-note-right="Компоненты: IdentificationCard, ConfidenceMeter (low), EmptyState-плашка, кнопки эскалации.">
+          <header class="app-bar">
+            <div class="brand">
+              <div class="brand-mark" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.2" stroke="#2fc4a3" stroke-width="1.6"/><path d="M10 4.2v11.6M4.2 10h11.6" stroke="#38b6ff" stroke-width="1.2"/><circle cx="10" cy="10" r="2.1" fill="#2fc4a3"/></svg>
+              </div>
+              <div class="brand-name">Совфрахт<span>Детали</span></div>
+            </div>
+            <div class="role-stack">
+              <div class="role-pill"><i></i> Механик</div>
+              <div class="role-sub">SF-24082 · 18.08.2026</div>
+            </div>
+          </header>
+          <div class="screen-body screen-body--tight">
+            <article class="identification-card">
+              <div class="id-top">
+                <div style="flex:1;min-width:0">
+                  <div class="kicker">Опознание · черновик</div>
+                  <h2>Клапан предохранительный масла</h2>
+                  <div class="id-type">Система смазки · relief valve</div>
+                </div>
+                <div class="confidence-meter confidence-meter--low" style="--val:41">
+                  <svg viewBox="0 0 36 36" aria-hidden="true">
+                    <circle class="cm-track" cx="18" cy="18" r="15.5" pathLength="100"/>
+                    <circle class="cm-val" cx="18" cy="18" r="15.5" pathLength="100"/>
+                  </svg>
+                  <div class="cm-center"><b>41<small>%</small></b><span>низкая</span></div>
+                </div>
+              </div>
+              <div class="id-grid">
+                <div class="id-field"><span>Производитель</span><b>возможно MAN Energy</b></div>
+                <div class="id-field"><span>Модель</span><b>не уверенно</b></div>
+                <div class="id-field"><span>Назначение</span><b>Сброс давления смазки ГД</b></div>
+                <div class="id-field"><span>Узел</span><b>Масляный контур, правый борт</b></div>
+              </div>
+              <div class="id-mark">
+                <span>Прочитанная маркировка</span>
+                <code>51.3??.18  ·  S/N ????412  ·  20?8</code>
+              </div>
+              <p class="id-caveat">Оговорка: блик вспышки закрыл 4 символа. Тип определён по форме корпуса, не по номеру.</p>
+            </article>
+
+            <div class="banner banner--danger">
+              <svg class="banner-ico" viewBox="0 0 20 20" fill="none"><path d="M10 3l8 14H2L10 3z" stroke="#ff5d73"/><path d="M10 8v5M10 15.2v.6" stroke="#ff5d73"/></svg>
+              <div><b>Достоверность ниже порога 70%</b>Автоподтверждение отключено. Заявка уйдёт эксперту — механик не принимает решение по коду.</div>
+            </div>
+
+            <div class="banner banner--warn">
+              <svg class="banner-ico" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#f0a341"/><path d="M10 6v5M10 13.5v.8" stroke="#f0a341"/></svg>
+              <div><b>Опознана, но в каталоге закупки не найдена</b>Нет IMPA/OEM-карточки Совфрахт. Нельзя выставить поставщиков и цену.</div>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn btn--warn btn--sm" type="button">Отправить эксперту</button>
+              <button class="btn btn--ghost btn--sm" type="button">Добавить в каталог</button>
+            </div>
+            <p class="tiny muted">«Добавить в каталог» доступно снабженцу и админу. Механик видит кнопку серой, если нет права.</p>
+          </div>
+        </section>
+
+        <!-- PurchaseScreen -->
+        <section class="screen" id="screen-purchase" data-screen="purchase"
+          data-note-left="Роль: механик / снабженец. Список офферов + блок аналога. Лучший оффер выделен рамкой acc."
+          data-note-right="Компоненты: AppBar, IdentificationCard (сжатый), SupplierRow, analog panel.">
+          <header class="app-bar">
+            <div class="brand">
+              <div class="brand-mark" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.2" stroke="#2fc4a3" stroke-width="1.6"/><path d="M10 4.2v11.6M4.2 10h11.6" stroke="#38b6ff" stroke-width="1.2"/><circle cx="10" cy="10" r="2.1" fill="#2fc4a3"/></svg>
+              </div>
+              <div class="brand-name">Совфрахт<span>Детали</span></div>
+            </div>
+            <div class="role-stack">
+              <div class="role-pill"><i></i> Снабженец</div>
+              <div class="role-sub">заявка SF-24081</div>
+            </div>
+          </header>
+          <div class="screen-body">
+            <div class="page-head">
+              <div class="kicker">Каталог · IMPA 59.12.15</div>
+              <h1>Закупка</h1>
+              <p>ТНВД Bosch CP3.4 · 0 445 020 073 · т/х «Северный ветер»</p>
+            </div>
+
+            <div class="codes">
+              <div class="code-cell"><span>IMPA</span><b>59.12.15</b></div>
+              <div class="code-cell"><span>OEM</span><b>0 445 020 073</b></div>
+            </div>
+
+            <div class="section-label"><span>Поставщики</span><span>3 предложения</span></div>
+
+            <article class="supplier-row is-best">
+              <div class="sup-logo">WSS</div>
+              <div>
+                <div class="sup-name">Wilhelmsen Ships Service</div>
+                <div class="sup-meta">
+                  <span class="pill pill--ok">в наличии</span>
+                  <span class="pill">7 сут. CIF СПб</span>
+                </div>
+              </div>
+              <div class="sup-price"><b>1 840 €</b><span>оригинал · 1 шт.</span></div>
+            </article>
+            <article class="supplier-row">
+              <div class="sup-logo">MSK</div>
+              <div>
+                <div class="sup-name">MSK Shipspares</div>
+                <div class="sup-meta">
+                  <span class="pill pill--info">под заказ</span>
+                  <span class="pill">14–18 сут.</span>
+                </div>
+              </div>
+              <div class="sup-price"><b>1 620 €</b><span>оригинал · 1 шт.</span></div>
+            </article>
+            <article class="supplier-row">
+              <div class="sup-logo">GAC</div>
+              <div>
+                <div class="sup-name">GAC Marine</div>
+                <div class="sup-meta">
+                  <span class="pill">склад Сингапур</span>
+                  <span class="pill">21 сут.</span>
+                </div>
+              </div>
+              <div class="sup-price"><b>1 980 $</b><span>оригинал · 1 шт.</span></div>
+            </article>
+
+            <div class="panel">
+              <div class="section-label" style="margin-bottom:8px"><span>Аналог</span><span class="pill pill--warn">не OEM</span></div>
+              <h3 style="font-size:15px">Delphi / PHF серия · совместимый корпус</h3>
+              <p class="tiny muted" style="margin:6px 0 10px">Дешевле на ~28%. Не рекомендован для главного двигателя без согласования технадзора.</p>
+              <div class="supplier-row" style="padding:10px">
+                <div class="sup-logo">HNA</div>
+                <div>
+                  <div class="sup-name">Hanseatic Marine</div>
+                  <div class="sup-meta"><span class="pill">10 сут.</span><span class="pill pill--warn">аналог</span></div>
+                </div>
+                <div class="sup-price"><b>1 320 €</b><span>совместимый</span></div>
+              </div>
+            </div>
+
+            <button class="btn btn--primary btn--block" type="button">Создать заявку на закупку</button>
+          </div>
+        </section>
+
+        <!-- RepairScreen -->
+        <section class="screen" id="screen-repair" data-screen="repair"
+          data-note-left="Вердикт — главный объект экрана. Сравнение ремонт/замена в двух колонках. Дисклеймер обязателен и не прячется."
+          data-note-right="Компоненты: RepairVerdict, compare, disclaimer. Роль: механик + судовладелец на просмотре.">
+          <header class="app-bar">
+            <div class="brand">
+              <div class="brand-mark" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.2" stroke="#2fc4a3" stroke-width="1.6"/><path d="M10 4.2v11.6M4.2 10h11.6" stroke="#38b6ff" stroke-width="1.2"/><circle cx="10" cy="10" r="2.1" fill="#2fc4a3"/></svg>
+              </div>
+              <div class="brand-name">Совфрахт<span>Детали</span></div>
+            </div>
+            <div class="role-stack">
+              <div class="role-pill"><i></i> Механик</div>
+              <div class="role-sub">вердикт SF-24081</div>
+            </div>
+          </header>
+          <div class="screen-body">
+            <div class="repair-verdict">
+              <div class="verdict-stamp">замена</div>
+              <h2>Рекомендуем замену ТНВД</h2>
+              <p class="tiny muted" style="margin-top:8px">Износ плунжерной пары и нестабильное давление рампы. Судовой ремонт не восстанавливает паспортный ресурс CP3.4.</p>
+              <div class="compare">
+                <div class="compare-col">
+                  <h3>Ремонт на судне</h3>
+                  <b>640 €</b>
+                  <ul>
+                    <li>комплект уплотнений</li>
+                    <li>8–12 ч работы ЦМО</li>
+                    <li>ресурс ~30–40%</li>
+                    <li>риск повторного отказа</li>
+                  </ul>
+                </div>
+                <div class="compare-col is-pick">
+                  <h3>Замена OEM</h3>
+                  <b>1 840 €</b>
+                  <ul>
+                    <li>оригинал Bosch</li>
+                    <li>поставка 7 сут.</li>
+                    <li>полный ресурс</li>
+                    <li>рекомендация системы</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="disclaimer">
+                <strong>Обязательный дисклеймер</strong>
+                Рекомендация сформирована автоматически по каталогу и типовым отказам. Не является заключением классификационного общества и не заменяет решение стармеха / судового механика. Окончательное решение о ремонте или замене принимает экипаж и судовладелец.
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn--ghost btn--sm" type="button">Оставить на контроле</button>
+              <button class="btn btn--primary btn--sm" type="button">Заказать замену</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ExpertQueueScreen -->
+        <section class="screen" id="screen-expert" data-screen="expert"
+          data-note-left="Роль: эксперт. Сначала очередь модерации, ниже — раскрытая карточка одной задачи."
+          data-note-right="Компоненты: AppBar, task-row, ModerationTaskCard. Кнопки: подтвердить / исправить.">
+          <header class="app-bar">
+            <div class="brand">
+              <div class="brand-mark" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.2" stroke="#2fc4a3" stroke-width="1.6"/><path d="M10 4.2v11.6M4.2 10h11.6" stroke="#38b6ff" stroke-width="1.2"/><circle cx="10" cy="10" r="2.1" fill="#2fc4a3"/></svg>
+              </div>
+              <div class="brand-name">Совфрахт<span>Детали</span></div>
+            </div>
+            <div class="role-stack">
+              <div class="role-pill"><i></i> Эксперт</div>
+              <div class="role-sub">очередь · 6 задач</div>
+            </div>
+          </header>
+          <div class="screen-body">
+            <div class="page-head">
+              <div class="kicker">Модерация опознаний</div>
+              <h1>Очередь эксперта</h1>
+              <p>Сначала низкая достоверность и позиции вне каталога.</p>
+            </div>
+
+            <div class="stat-row">
+              <div class="stat"><b>3</b><span>низкая %</span></div>
+              <div class="stat"><b>2</b><span>нет в каталоге</span></div>
+              <div class="stat"><b>1</b><span>спор OEM</span></div>
+            </div>
+
+            <article class="task-row">
+              <div>
+                <h3>Клапан предохранительный масла</h3>
+                <p class="tiny muted">SF-24082 · т/х «Северный ветер» · 41%</p>
+              </div>
+              <span class="pill pill--danger">срочно</span>
+            </article>
+            <article class="task-row">
+              <div>
+                <h3>Фильтр сепаратора топлива</h3>
+                <p class="tiny muted">SF-24079 · т/х «Ладога» · нет IMPA</p>
+              </div>
+              <span class="pill pill--warn">каталог</span>
+            </article>
+            <article class="task-row">
+              <div>
+                <h3>Подшипник дейдвуда</h3>
+                <p class="tiny muted">SF-24074 · т/х «Нева-3» · спор OEM</p>
+              </div>
+              <span class="pill pill--info">спор</span>
+            </article>
+
+            <div class="section-label"><span>Открытая задача</span><span>SF-24082</span></div>
+            <article class="moderation-task-card">
+              <div class="mtc-photos">
+                <div>
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid slice"><rect width="160" height="110" fill="#1a140e"/><rect x="18" y="18" width="124" height="74" fill="#b7c0c8"/><text x="28" y="58" font-size="9" fill="#111">51.3??.18</text></svg>
+                  <label>Шильдик</label>
+                </div>
+                <div>
+                  <svg viewBox="0 0 120 110"><rect width="120" height="110" fill="#121820"/><rect x="28" y="36" width="64" height="40" rx="8" fill="#3a4a58"/></svg>
+                  <label>Деталь</label>
+                </div>
+                <div>
+                  <svg viewBox="0 0 120 110"><rect width="120" height="110" fill="#0e1822"/><path d="M16 82h88M30 82V28h24v54" stroke="#38b6ff" fill="none"/></svg>
+                  <label>Место</label>
+                </div>
+              </div>
+              <div class="mtc-body">
+                <div>
+                  <div class="kicker">Предложенный результат</div>
+                  <h3 style="font-size:16px">Клапан предохранительный масла · возможно MAN</h3>
+                  <p class="tiny muted">Маркировка 51.3??.18 · уверенность 41%</p>
+                </div>
+                <div class="candidate is-pick">
+                  <span class="radio"></span>
+                  <div>
+                    <b>MAN Energy Solutions · 51.324.18</b>
+                    <p class="tiny muted">Лучший кандидат по форме корпуса и месту установки</p>
+                  </div>
+                </div>
+                <div class="candidate">
+                  <span class="radio"></span>
+                  <div>
+                    <b>Wartsila · relief 51.318.12</b>
+                    <p class="tiny muted">Похожий фланец, другая резьба датчика</p>
+                  </div>
+                </div>
+                <div class="candidate">
+                  <span class="radio"></span>
+                  <div>
+                    <b>Не опознана / запросить новый кадр</b>
+                    <p class="tiny muted">Вернуть механику на пересъёмку шильдика</p>
+                  </div>
+                </div>
+                <div class="btn-row">
+                  <button class="btn btn--primary btn--sm" type="button">Подтвердить</button>
+                  <button class="btn btn--ghost btn--sm" type="button">Исправить</button>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- RoleLandingScreen -->
+        <section class="screen" id="screen-landing" data-screen="landing"
+          data-note-left="Стартовый экран не-механика. Съёмки здесь нет. Переключатель ролей — только для макета."
+          data-note-right="Снабженец/судовладелец: реестр заявок. Эксперт: очередь. Компоненты: AppBar, EmptyState, task-row.">
+          <header class="app-bar">
+            <div class="brand">
+              <div class="brand-mark" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.2" stroke="#2fc4a3" stroke-width="1.6"/><path d="M10 4.2v11.6M4.2 10h11.6" stroke="#38b6ff" stroke-width="1.2"/><circle cx="10" cy="10" r="2.1" fill="#2fc4a3"/></svg>
+              </div>
+              <div class="brand-name">Совфрахт<span>Детали</span></div>
+            </div>
+            <div class="role-stack">
+              <div class="role-pill" id="landing-pill"><i></i> Снабженец</div>
+              <div class="role-sub">флот Совфрахт · 14 судов</div>
+            </div>
+          </header>
+          <div class="screen-body">
+            <div class="page-head">
+              <div class="kicker">Рабочий стол</div>
+              <h1>Реестр заявок</h1>
+              <p>Не экран съёмки. Старт для берега и эксперта.</p>
+            </div>
+
+            <div class="role-switch" id="role-switch">
+              <button type="button" class="is-active" data-role="supply">Снабженец</button>
+              <button type="button" data-role="owner">Судовладелец</button>
+              <button type="button" data-role="expert">Эксперт</button>
+            </div>
+
+            <div class="role-view is-active" id="role-supply">
+              <div class="stat-row">
+                <div class="stat"><b>11</b><span>открытых</span></div>
+                <div class="stat"><b>4</b><span>к закупке</span></div>
+                <div class="stat"><b>2</b><span>без каталога</span></div>
+              </div>
+              <article class="task-row">
+                <div>
+                  <h3>ТНВД Bosch CP3.4</h3>
+                  <p class="tiny muted">SF-24081 · «Северный ветер» · 1 840 €</p>
+                </div>
+                <span class="pill pill--ok">в каталоге</span>
+              </article>
+              <article class="task-row">
+                <div>
+                  <h3>Клапан масла MAN</h3>
+                  <p class="tiny muted">SF-24082 · ждёт эксперта</p>
+                </div>
+                <span class="pill pill--warn">нет в каталоге</span>
+              </article>
+              <article class="task-row">
+                <div>
+                  <h3>Фильтр Alfa Laval MAB-104</h3>
+                  <p class="tiny muted">SF-24077 · «Ладога» · ждёт счёт</p>
+                </div>
+                <span class="pill pill--info">закупка</span>
+              </article>
+            </div>
+
+            <div class="role-view" id="role-owner">
+              <div class="stat-row">
+                <div class="stat"><b>3</b><span>на решении</span></div>
+                <div class="stat"><b>18.4k €</b><span>к оплате</span></div>
+                <div class="stat"><b>1</b><span>критич.</span></div>
+              </div>
+              <article class="task-row">
+                <div>
+                  <h3>Замена ТНВД · «Северный ветер»</h3>
+                  <p class="tiny muted">Рекомендация системы: замена OEM · 1 840 €</p>
+                </div>
+                <span class="pill pill--warn">решение</span>
+              </article>
+              <article class="task-row">
+                <div>
+                  <h3>Сепаратор топлива · «Ладога»</h3>
+                  <p class="tiny muted">Ремонт на судне · 410 €</p>
+                </div>
+                <span class="pill">контроль</span>
+              </article>
+              <p class="tiny muted">Судовладелец не снимает детали. Он видит флот, деньги и вердикты.</p>
+            </div>
+
+            <div class="role-view" id="role-expert">
+              <div class="stat-row">
+                <div class="stat"><b>6</b><span>в очереди</span></div>
+                <div class="stat"><b>3</b><span>&lt; 70%</span></div>
+                <div class="stat"><b>41м</b><span>старейшая</span></div>
+              </div>
+              <article class="task-row">
+                <div>
+                  <h3>Клапан масла · 41%</h3>
+                  <p class="tiny muted">SF-24082 · блик на шильдике</p>
+                </div>
+                <span class="pill pill--danger">взять</span>
+              </article>
+              <article class="task-row">
+                <div>
+                  <h3>Подшипник дейдвуда · спор OEM</h3>
+                  <p class="tiny muted">SF-24074 · 2 кандидата</p>
+                </div>
+                <span class="pill pill--info">спор</span>
+              </article>
+              <p class="tiny muted">Эксперт стартует с очереди, не с камеры.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- System states -->
+        <section class="screen" id="screen-states" data-screen="states"
+          data-note-left="Явные системные состояния для фронта: пусто, идёт распознавание, ошибка OCR/сети."
+          data-note-right="Компоненты: EmptyState, skeleton, progress-steps. Не отдельные продуктовые экраны, а паттерны.">
+          <header class="app-bar">
+            <div class="brand">
+              <div class="brand-mark" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.2" stroke="#2fc4a3" stroke-width="1.6"/><path d="M10 4.2v11.6M4.2 10h11.6" stroke="#38b6ff" stroke-width="1.2"/><circle cx="10" cy="10" r="2.1" fill="#2fc4a3"/></svg>
+              </div>
+              <div class="brand-name">Совфрахт<span>Детали</span></div>
+            </div>
+            <div class="role-stack">
+              <div class="role-pill"><i></i> Система</div>
+              <div class="role-sub">паттерны состояний</div>
+            </div>
+          </header>
+          <div class="screen-body">
+            <div class="state-stack">
+              <div class="state-block">
+                <div class="section-label"><span>Пусто</span></div>
+                <div class="empty-state">
+                  <div class="empty-ico">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="7" width="20" height="14" rx="3" stroke="#8aa6c2"/><circle cx="14" cy="14" r="4" stroke="#2fc4a3"/></svg>
+                  </div>
+                  <h2>Пока нет заявок</h2>
+                  <p>Механик ещё не снимал детали с этого судна. Первая заявка появится после съёмки шильдика.</p>
+                </div>
+              </div>
+
+              <div class="state-block">
+                <div class="section-label"><span>Идёт распознавание</span></div>
+                <div class="panel" style="position:relative; overflow:hidden; min-height:168px">
+                  <div class="scan-line"></div>
+                  <div class="skeleton sk-title"></div>
+                  <div class="skeleton sk-line" style="width:88%"></div>
+                  <div class="skeleton sk-line" style="width:64%"></div>
+                  <div class="skeleton sk-block"></div>
+                </div>
+                <div class="progress-steps">
+                  <div class="pstep is-done"><span class="dot"></span> Кадры загружены</div>
+                  <div class="pstep is-run"><span class="dot"></span> Читаем маркировку шильдика…</div>
+                  <div class="pstep"><span class="dot"></span> Сверяем с каталогом закупки</div>
+                </div>
+              </div>
+
+              <div class="state-block">
+                <div class="section-label"><span>Ошибка</span></div>
+                <div class="banner banner--danger">
+                  <svg class="banner-ico" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#ff5d73"/><path d="M7 7l6 6M13 7l-6 6" stroke="#ff5d73"/></svg>
+                  <div><b>Не удалось прочитать шильдик</b>Слабый контраст и блик. Переснимите табличку без вспышки в упор или протрите масло.</div>
+                </div>
+                <div class="btn-row">
+                  <button class="btn btn--ghost btn--sm" type="button">Повторить</button>
+                  <button class="btn btn--danger btn--sm" type="button">Отправить эксперту</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <aside class="anno is-right" id="anno-right"></aside>
+  </div>
+
+  <section class="handoff">
+    <div class="handoff-box">
+      <h2>Перенос на фронт</h2>
+
+      <h3>1. Design-токены</h3>
+      <ul>
+        <li>Цвет: <code>--bg</code> #0a1420, <code>--bg-elev</code> #0c1826, <code>--panel</code> #132639, <code>--panel2</code> #18324a, <code>--panel3</code> #1d3c58, <code>--line</code> #22405c, <code>--line2</code> #2c5476, <code>--ink</code> #eaf2fb, <code>--ink-soft</code> #c9d8e8, <code>--mut</code> #8aa6c2, <code>--acc</code> #2fc4a3, <code>--acc-ink</code> #04241c, <code>--acc-dim</code>, <code>--acc-glow</code>, <code>--acc2</code> #38b6ff, <code>--acc2-dim</code>, <code>--warn</code> #f0a341, <code>--warn-ink</code>, <code>--warn-dim</code>, <code>--danger</code> #ff5d73, <code>--danger-dim</code></li>
+        <li>Отступы: <code>--s-2</code> 8, <code>--s-3</code> 12, <code>--s-4</code> 16, <code>--s-5</code> 20, <code>--s-6</code> 24, <code>--pad</code> 16, <code>--touch</code> 48, <code>--touch-lg</code> 56</li>
+        <li>Радиусы: <code>--radius-sm</code> 12, <code>--radius</code> 16, <code>--radius-lg</code> 20</li>
+        <li>Типографика: <code>--font</code> Manrope, <code>--mono</code> IBM Plex Mono</li>
+        <li>Сетка: <code>--app-max</code> 480px — колонка приложения, не растягивать контент на десктопе</li>
+      </ul>
+
+      <h3>2. Переиспользуемые компоненты → React</h3>
+      <ul>
+        <li><code>AppBar</code> — логотип + <code>role-pill</code> + судно/заявка</li>
+        <li><code>CaptureSlot</code> — primary/sec, empty/filled, рамка-видоискатель, shutter, recapture</li>
+        <li><code>ConfidenceMeter</code> — SVG-кольцо, модификаторы high / mid / low по порогам 70 / 50</li>
+        <li><code>IdentificationCard</code> — заголовок, тип, поля, маркировка, оговорка</li>
+        <li><code>TabBar</code> — Отчёт / Закупка / Ремонт</li>
+        <li><code>SupplierRow</code> — логотип, цена, срок, наличие, флаг <code>is-best</code></li>
+        <li><code>RepairVerdict</code> — штамп, сравнение колонок, обязательный disclaimer</li>
+        <li><code>ModerationTaskCard</code> — фото, предложенный результат, кандидаты, confirm/fix</li>
+        <li><code>EmptyState</code> — пусто / ошибка / нет прав; рядом паттерны skeleton и progress-steps</li>
+      </ul>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      var tabs = document.querySelectorAll(".proto-tab");
+      var screens = document.querySelectorAll(".screen");
+      var left = document.getElementById("anno-left");
+      var right = document.getElementById("anno-right");
+
+      function show(id) {
+        screens.forEach(function (s) {
+          s.classList.toggle("is-active", s.dataset.screen === id);
+        });
+        tabs.forEach(function (t) {
+          t.classList.toggle("is-active", t.dataset.screen === id);
+        });
+        var active = document.querySelector(".screen.is-active");
+        if (active) {
+          left.innerHTML = "<h3>Контекст</h3><p>" + (active.dataset.noteLeft || "") + "</p>";
+          right.innerHTML = "<h3>Компоненты</h3><p>" + (active.dataset.noteRight || "") + "</p>";
+        }
+      }
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function () { show(tab.dataset.screen); });
+      });
+      show("capture");
+
+      document.querySelectorAll("[data-tabs]").forEach(function (bar) {
+        bar.addEventListener("click", function (e) {
+          var btn = e.target.closest("button[data-panel]");
+          if (!btn) return;
+          var id = btn.dataset.panel;
+          bar.querySelectorAll("button").forEach(function (b) {
+            b.classList.toggle("is-active", b === btn);
+          });
+          ["rf-report", "rf-buy", "rf-fix"].forEach(function (pid) {
+            var el = document.getElementById(pid);
+            if (el) el.classList.toggle("is-active", pid === id);
+          });
+        });
+      });
+
+      document.querySelectorAll("[data-slot]").forEach(function (slot) {
+        slot.addEventListener("click", function (e) {
+          if (e.target.closest(".recapture")) {
+            slot.classList.remove("is-filled");
+            slot.querySelector(".slot-empty").hidden = false;
+            slot.querySelector(".slot-preview").hidden = true;
+          } else {
+            slot.classList.add("is-filled");
+            slot.querySelector(".slot-empty").hidden = true;
+            slot.querySelector(".slot-preview").hidden = false;
+          }
+          var plate = document.getElementById("slot-plate");
+          var cta = document.getElementById("btn-recognize");
+          var hint = document.getElementById("capture-hint");
+          var ready = plate.classList.contains("is-filled");
+          cta.classList.toggle("is-disabled", !ready);
+          hint.textContent = ready
+            ? "Шильдик есть. Можно распознавать — остальные кадры улучшают точность."
+            : "Нужен хотя бы снимок шильдика — без него OCR не запустится.";
+        });
+      });
+
+      document.getElementById("btn-recognize").addEventListener("click", function () {
+        if (this.classList.contains("is-disabled")) return;
+        document.querySelector('.proto-tab[data-screen="report"]').click();
+      });
+
+      var roleSwitch = document.getElementById("role-switch");
+      var pill = document.getElementById("landing-pill");
+      var labels = { supply: "Снабженец", owner: "Судовладелец", expert: "Эксперт" };
+      roleSwitch.addEventListener("click", function (e) {
+        var btn = e.target.closest("button[data-role]");
+        if (!btn) return;
+        roleSwitch.querySelectorAll("button").forEach(function (b) {
+          b.classList.toggle("is-active", b === btn);
+        });
+        ["supply", "owner", "expert"].forEach(function (r) {
+          document.getElementById("role-" + r).classList.toggle("is-active", r === btn.dataset.role);
+        });
+        pill.innerHTML = "<i></i> " + labels[btn.dataset.role];
+      });
+    })();
+  </script>
+</body>
+</html>
