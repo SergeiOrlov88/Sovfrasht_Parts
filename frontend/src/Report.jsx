@@ -177,7 +177,9 @@ export default function Report({ scanId, onBack }) {
       )}
 
       {noCatalog && (
-        <div className="banner banner--warn">
+        /* Вторая плашка въезжает следом, а не одновременно: два предупреждения,
+           появившиеся разом, читаются как одна вспышка */
+        <div className="banner banner--warn" style={{ animationDelay: isLow ? '70ms' : '0ms' }}>
           <BannerWarn />
           <div>
             <b>Опознана, но в каталоге закупки не найдена</b>

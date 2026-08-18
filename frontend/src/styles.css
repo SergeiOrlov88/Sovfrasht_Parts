@@ -149,10 +149,16 @@ a { color: var(--acc2); }
   border-radius: var(--radius);
   font-size: 16px; font-weight: 800;
   text-decoration: none;
-  transition: transform .12s var(--ease), filter .12s var(--ease);
+  /* Только те свойства, которые реально меняются. filter здесь не менялся
+     никогда — убран. */
+  transition: transform var(--dur-press) var(--ease),
+              background-color var(--dur-state) ease,
+              border-color var(--dur-state) ease;
 }
-.btn:active { transform: scale(0.98); }
+/* Нажатие обязано быть слышно: интерфейс подтверждает, что услышал */
+.btn:active { transform: scale(0.97); }
 .btn:disabled { cursor: not-allowed; }
+.btn:disabled:active { transform: none; }
 
 .btn--primary { background: var(--acc); color: var(--acc-ink); box-shadow: 0 8px 28px var(--acc-glow); }
 .btn--primary:disabled { background: #1b3a34; color: #5e887c; box-shadow: none; }
@@ -192,11 +198,15 @@ a { color: var(--acc2); }
 .pill--mono { font-family: var(--mono); }
 
 /* ── Плашки ──────────────────────────────────────────────────────────────── */
+/* Ниже порога и нет в каталоге приходят вместе с отчётом. Появление мягкое,
+   чтобы предупреждение не подменяло уже прочитанный текст рывком; задержку
+   второй плашке задаёт Report.jsx. */
 .banner {
   display: flex; gap: 10px; align-items: flex-start;
   padding: 12px 14px; border-radius: var(--radius-sm);
   border: 1px solid var(--line); background: var(--panel2);
   font-size: 13px; line-height: 1.45; color: var(--ink-soft);
+  animation: enter-up var(--dur-enter) var(--ease) both;
 }
 .banner b { display: block; color: var(--ink); margin-bottom: 2px; }
 .banner--warn { background: var(--warn-dim); border-color: rgba(240, 163, 65, .35); }
@@ -232,6 +242,9 @@ a { color: var(--acc2); }
 /* ── Экран съёмки ────────────────────────────────────────────────────────── */
 .capture-slot {
   position: relative; background: var(--panel);
+  /* Пунктир -> сплошная acc-рамка при заполнении: цвет доезжает плавно,
+     стиль границы переключается сразу (он не анимируем) */
+  transition: border-color var(--dur-state) ease;
   border: 1.5px dashed var(--line2); border-radius: var(--radius-lg);
   overflow: hidden; display: flex; flex-direction: column;
   align-items: center; justify-content: center;
@@ -270,7 +283,9 @@ a { color: var(--acc2); }
   border: 1px solid var(--line2); color: var(--ink);
   font-weight: 700; font-size: 13px;
   display: inline-flex; align-items: center; gap: var(--s-2);
+  transition: transform var(--dur-press) var(--ease), border-color var(--dur-state) ease;
 }
+.shutter:active { transform: scale(0.97); }
 .shutter-dot {
   width: 18px; height: 18px; border-radius: 50%;
   border: 2px solid var(--ink);
@@ -278,7 +293,13 @@ a { color: var(--acc2); }
 }
 .slot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
-.slot-preview { position: absolute; inset: 0; }
+/* Кадр не возникает из ничего: подрастает от 0.98 и проявляется — как будто
+   снимок сел в рамку видоискателя. Нужно, чтобы подмена пустого слота готовым
+   не читалась как сбой. */
+.slot-preview {
+  position: absolute; inset: 0;
+  animation: enter-scale var(--dur-enter) var(--ease) both;
+}
 .slot-preview img { width: 100%; height: 100%; object-fit: cover; }
 .recapture {
   position: absolute; right: 10px; bottom: 10px; z-index: 2;
@@ -286,7 +307,9 @@ a { color: var(--acc2); }
   background: rgba(10, 20, 32, 0.78); border: 1px solid var(--line);
   color: var(--ink); font-size: 12px; font-weight: 700;
   display: inline-flex; align-items: center; gap: 6px;
+  transition: transform var(--dur-press) var(--ease), border-color var(--dur-state) ease;
 }
+.recapture:active { transform: scale(0.97); }
 .recapture--left { right: auto; left: 10px; }
 
 /* Живой предпросмотр камеры — на месте главного слота */
@@ -303,9 +326,14 @@ a { color: var(--acc2); }
 .confidence-meter { --val: 0; width: 86px; flex: 0 0 auto; text-align: center; }
 .confidence-meter svg { width: 78px; height: 78px; transform: rotate(-90deg); }
 .cm-track { fill: none; stroke: var(--panel3); stroke-width: 3.2; }
+/* Заполнение дуги от нуля до измеренного значения. Единственное место, где
+   анимируется не transform/opacity: stroke-dasharray — свойство отрисовки,
+   layout оно не трогает, а элемент один и размером 78px. Дуга набирается,
+   поэтому число читается как измеренное, а не просто объявленное. */
 .cm-val {
   fill: none; stroke: var(--acc); stroke-width: 3.2; stroke-linecap: round;
   stroke-dasharray: var(--val) 100;
+  animation: ring-fill var(--dur-fill) var(--ease) both;
 }
 .confidence-meter--mid .cm-val { stroke: var(--warn); }
 .confidence-meter--low .cm-val { stroke: var(--danger); }
@@ -320,10 +348,14 @@ a { color: var(--acc2); }
 }
 
 /* ── Карточка опознания ──────────────────────────────────────────────────── */
+/* Итог распознавания. Появляется один раз на скан — как раз тот случай, когда
+   переход оправдан: без него карточка выстреливает на месте скелетона и
+   читается как рывок. */
 .identification-card {
   background: var(--panel); border: 1px solid var(--line);
   border-radius: var(--radius-lg); padding: var(--s-4);
   position: relative; overflow: hidden;
+  animation: enter-up var(--dur-enter) var(--ease) both;
 }
 /* Градиентная кромка сверху — метка «это результат распознавания» */
 .identification-card::before {
@@ -361,7 +393,17 @@ a { color: var(--acc2); }
   background: var(--panel); border: 1px solid var(--line);
   border-radius: 14px; padding: 4px; gap: 4px;
 }
-.tab-bar button { min-height: 40px; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--mut); }
+/* Переключение вкладок пользователь делает десятками раз за смену, поэтому
+   содержимое панели НЕ анимируется: задержка на частом действии читается как
+   тормоза. Двигается только сам сегмент — цветом, без сдвига. */
+.tab-bar button {
+  min-height: 40px; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--mut);
+  transition: color var(--dur-state) ease,
+              background-color var(--dur-state) ease,
+              box-shadow var(--dur-state) ease,
+              transform var(--dur-press) var(--ease);
+}
+.tab-bar button:active { transform: scale(0.97); }
 .tab-bar button.is-active { background: var(--panel3); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line2); }
 
 /* ── Каталожные коды ─────────────────────────────────────────────────────── */
@@ -449,6 +491,14 @@ a { color: var(--acc2); }
 }
 .task-row.is-current { border-color: var(--acc2); }
 .task-row h3 { font-size: 14px; font-weight: 700; }
+/* Список задач, кандидаты и фильтры тоже нажимаются — отклик такой же */
+.task-row, .candidate, .filters button, .demo-switch button {
+  transition: transform var(--dur-press) var(--ease),
+              border-color var(--dur-state) ease,
+              background-color var(--dur-state) ease;
+}
+.task-row:active, .candidate:active,
+.filters button:active, .demo-switch button:active { transform: scale(0.98); }
 
 .moderation-task-card {
   background: var(--panel); border: 1px solid var(--line);
@@ -523,25 +573,47 @@ a { color: var(--acc2); }
 .sk-block { height: 84px; }
 
 .progress-steps { display: flex; flex-direction: column; gap: var(--s-2); }
-.pstep { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--mut); }
+/* Шаги въезжают каскадом: три элемента, появившиеся разом, читаются как
+   вспышка. Задержки короткие — каскад декоративен и не должен задерживать. */
+.pstep {
+  display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--mut);
+  animation: enter-up var(--dur-enter) var(--ease) both;
+  /* Переход шага ждёт -> идёт -> сделан только цветом: это смысл, а не движение */
+  transition: color var(--dur-state) ease;
+}
+.pstep:nth-child(2) { animation-delay: 60ms; }
+.pstep:nth-child(3) { animation-delay: 120ms; }
 .pstep.is-done { color: var(--acc); }
 .pstep.is-run { color: var(--ink); }
-.pstep .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line2); flex: 0 0 auto; }
+.pstep .dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--line2); flex: 0 0 auto;
+  transition: background-color var(--dur-state) ease, box-shadow var(--dur-state) ease;
+}
 .pstep.is-done .dot { background: var(--acc); }
 .pstep.is-run .dot { background: var(--acc2); box-shadow: 0 0 0 4px var(--acc2-dim); animation: pulse 1.2s infinite; }
 
 /* Линия-сканер поверх скелетона: видно, что система читает кадр */
 .scan-panel { position: relative; overflow: hidden; min-height: 168px; }
 .scan-line {
-  position: absolute; left: 0; right: 0; height: 2px;
+  position: absolute; left: 0; right: 0; top: 0; height: 2px;
   background: linear-gradient(90deg, transparent, var(--acc), transparent);
-  animation: scan 1.8s var(--ease) infinite;
   box-shadow: 0 0 12px var(--acc);
+  /* Было top — это layout на каждом кадре. Стало transform: композитинг на GPU.
+     alternate — луч возвращается, а не прыгает в начало; ease-in-out даёт
+     разворот на краях вместо рывка. */
+  animation: scan 2.2s var(--ease-in-out) infinite alternate;
+  will-change: transform;
 }
 
 @keyframes shimmer { from { transform: translateX(-60%); } to { transform: translateX(60%); } }
 @keyframes pulse { 50% { opacity: .45; } }
-@keyframes scan { from { top: 8%; } to { top: 88%; } }
+@keyframes scan { from { transform: translateY(14px); } to { transform: translateY(148px); } }
+
+/* Появление. Сдвиг и масштаб берутся из токенов: при prefers-reduced-motion
+   они обнулены, и остаётся только прозрачность. */
+@keyframes enter-up { from { opacity: 0; transform: translateY(var(--enter-shift)); } }
+@keyframes enter-scale { from { opacity: 0; transform: scale(var(--enter-scale)); } }
+@keyframes ring-fill { from { stroke-dasharray: 0 100; } }
 
 /* ── Уведомления ─────────────────────────────────────────────────────────── */
 .notice-list { display: flex; flex-direction: column; gap: var(--s-2); }
@@ -567,5 +639,16 @@ a { color: var(--acc2); }
 
 /* ── Уважение к системным настройкам ─────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
+  /* Бесконечные циклы — чистое движение без смысла, убираем совсем */
+  .scan-line, .skeleton::after { display: none; }
+  .pstep.is-run .dot { animation: none; }
+  /* Кольцо показываем сразу заполненным: набор дуги — тоже движение */
+  .cm-val { animation: none; }
+  /* Нажатие подтверждаем цветом, без масштаба */
+  .btn:active, .shutter:active, .recapture:active, .tab-bar button:active,
+  .task-row:active, .candidate:active,
+  .filters button:active, .demo-switch button:active { transform: none; }
+  /* Появление остаётся, но только прозрачностью: --enter-shift и --enter-scale
+     обнулены в theme.css, поэтому transform на входе уже единичный.
+     Переходы цвета не трогаем — они объясняют, что изменилось. */
 }
