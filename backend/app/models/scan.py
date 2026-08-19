@@ -103,6 +103,9 @@ class Recognition(Base, UUIDPKMixin, TimestampMixin):
     detected_tokens: Mapped[list | None] = mapped_column(JSONType)
     # Итог сопоставления с каталогом: matched | candidates | not_found
     catalog_status: Mapped[str | None] = mapped_column(sa.String(16))
+    # На чём держится опознание: by_number | appearance (FR-REC-07).
+    # Nullable: у сканов, созданных до введения признака, основание неизвестно.
+    identification_basis: Mapped[str | None] = mapped_column(sa.String(16))
 
     # Обратная связь пользователя по отчёту (FR-REP-04, B3)
     feedback_verdict: Mapped[str | None] = mapped_column(sa.String(16))

@@ -33,6 +33,18 @@ class PhotoKind(str, enum.Enum):
     context = "context"        # место установки
 
 
+class IdentificationBasis(str, enum.Enum):
+    """На чём держится опознание (FR-REC-07).
+
+    Определяется не типом кадра, а тем, подтверждён ли номер: маркировка,
+    выбитая на корпусе, равнозначна табличке.
+    """
+    # Номер дал точное совпадение с каталогом по коду (ступени 1-3 матчера)
+    by_number = "by_number"
+    # Подтверждённого номера нет — опознание по внешнему виду
+    appearance = "appearance"
+
+
 class RecognitionStatus(str, enum.Enum):
     auto = "auto"
     confirmed = "confirmed"

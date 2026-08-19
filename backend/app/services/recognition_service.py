@@ -21,7 +21,7 @@ from app.adapters.vision.base import OcrResult, PhotoInput, ProviderUnavailable,
 from app.adapters.vision.nameplate import parse_nameplate
 from app.adapters.vision.registry import get_ocr_provider, get_vision_provider
 from app.core.config import settings
-from app.models.enums import ModerationStatus, PhotoKind, RecognitionStatus, ScanStatus
+from app.models.enums import IdentificationBasis, ModerationStatus, PhotoKind, RecognitionStatus, ScanStatus
 from app.models.scan import (
     ModerationTask, Photo, Recognition, RecognitionCandidate, Scan,
 )
@@ -261,6 +261,15 @@ async def run_pipeline(db: AsyncSession, scan_id: uuid.UUID) -> PipelineOutcome:
         }
     recognition.catalog_status = match.status.value
     recognition.part_id = match.primary.id if match.primary else None
+
+    # Основание опознания (FR-REC-07). Подтверждённым считаем номер, давший
+    # точное совпадение по коду: match.primary заполняется только ступенями
+    # 1-3 матчера (точный код, алиас, вариант OCR). Нечёткие ступени 4-6 дают
+    # кандидатов без primary — это уже не подтверждение, а похожесть.
+    recognition.identification_basis = (
+        IdentificationBasis.by_number if match.primary is not None
+        else IdentificationBasis.appearance
+    ).value
 
     # Кандидаты (NFR-ACC-02). Искусственно НЕ добираем: нет совпадений —
     # отчёт честно скажет «нет в каталоге» (решение заказчика).

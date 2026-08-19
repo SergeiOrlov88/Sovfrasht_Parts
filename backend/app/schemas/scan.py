@@ -94,6 +94,9 @@ class RecognitionRead(BaseModel):
     # matched | candidates | not_found — «нет в каталоге» показывается честно,
     # похожее силой не подбирается (решение заказчика)
     catalog_status: str | None = None
+    # by_number | appearance — на чём держится опознание (FR-REC-07).
+    # None у сканов, обработанных до введения признака.
+    identification_basis: str | None = None
 
 
 class IdentificationRead(BaseModel):

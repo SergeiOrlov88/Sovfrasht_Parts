@@ -127,6 +127,8 @@ export default function Report({ scanId, onBack }) {
   const confidence = data.confidence ?? 0
   const isLow = confidence < HIGH || data.confidence_level === 'low'
   const noCatalog = !part && Boolean(ident)
+  // by_number — номер дал точное совпадение с каталогом; appearance — нет
+  const basis = recognition?.identification_basis
   const specs = part?.specs ? Object.entries(part.specs) : []
 
   return (
@@ -140,6 +142,18 @@ export default function Report({ scanId, onBack }) {
             <div className="kicker">{isLow ? 'Опознание · черновик' : 'Опознание'}</div>
             <h2>{part ? part.name : (ident?.title || 'Деталь не определена')}</h2>
             {ident?.part_type && <div className="id-type">{ident.part_type}</div>}
+            {/* Основание опознания (FR-REC-07). Показываем только когда
+                подтверждённого номера нет — «по номеру» это норма и шума
+                в интерфейсе не заслуживает. */}
+            {basis === 'appearance' && (
+              <div className="row wrap-row" style={{ marginTop: 8, gap: 6 }}>
+                <span className="pill pill--warn">
+                  {recognition?.oem_detected
+                    ? 'номер не подтверждён каталогом'
+                    : 'опознано по внешнему виду'}
+                </span>
+              </div>
+            )}
           </div>
           <ConfidenceMeter value={confidence} />
         </div>
@@ -301,7 +315,8 @@ export default function Report({ scanId, onBack }) {
           {candidates.length > 0 && (
             <div>
               <div className="section-label">
-                <span>Кандидаты</span><span>{candidates.length}</span>
+                <span>{basis === 'appearance' ? 'Похожее · не подтверждено' : 'Кандидаты'}</span>
+                <span>{candidates.length}</span>
               </div>
               <div className="stack">
                 {candidates.map(c => (

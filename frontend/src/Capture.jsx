@@ -17,7 +17,7 @@ import { BannerError } from './icons.jsx'
 
 // Второстепенные кадры. Шильдик описан отдельно — он главный, по нему OCR.
 const EXTRA_SLOTS = [
-  { kind: 'overview', title: 'Деталь целиком', hint: 'по возможности' },
+  { kind: 'overview', title: 'Деталь целиком', hint: 'шильдик или этот кадр' },
   { kind: 'context', title: 'Место установки', hint: 'контекст' },
 ]
 
@@ -182,7 +182,12 @@ export default function Capture({ user, onReady, onOpenById }) {
   const nameplate = shots.nameplate
   // busy — «экран занят»: это и загрузка кадров, и последующее распознавание
   const busy = sending || Boolean(scanId)
-  const canSend = Boolean(nameplate) && vesselId && !busy
+  // Запускаем по шильдику ИЛИ по общему виду (FR-CAP-06). Кадр «место
+  // установки» самостоятельным основанием не считается: на нём контекст,
+  // а не сама деталь.
+  const overview = shots.overview
+  const canStart = Boolean(nameplate || overview)
+  const canSend = canStart && vesselId && !busy
 
   async function send() {
     // Защита от повторного входа: React успевает отрисовать disabled не мгновенно,
@@ -263,7 +268,7 @@ export default function Capture({ user, onReady, onOpenById }) {
       ) : (
         <div className={`capture-slot capture-slot--primary${nameplate ? ' is-filled' : ''}`}>
           <Corners />
-          <span className="slot-req">обязательно</span>
+          <span className="slot-req slot-req--hint">повышает точность</span>
           <FilePicker kind="nameplate" inputs={fileInputs} onPick={attach} />
 
           {nameplate ? (
@@ -329,9 +334,16 @@ export default function Capture({ user, onReady, onOpenById }) {
       </button>
 
       {/* Отключённая кнопка обязана объяснять причину */}
-      {!nameplate && !busy && (
+      {!canStart && !busy && (
         <p className="tiny muted">
-          Нужен хотя бы снимок шильдика — без него OCR не запустится.
+          Нужен хотя бы один кадр: шильдик или деталь целиком.
+        </p>
+      )}
+      {/* Снято без шильдика — предупреждаем до отправки, а не после отчёта */}
+      {canStart && !nameplate && !busy && (
+        <p className="tiny muted">
+          Шильдика нет — опознаем по внешнему виду. Точную закупку по артикулу
+          в этом случае предложить нельзя.
         </p>
       )}
 

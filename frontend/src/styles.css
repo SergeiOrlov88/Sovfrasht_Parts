@@ -266,6 +266,9 @@ a { color: var(--acc2); }
   font-size: 10px; font-weight: 800; letter-spacing: 0.06em;
   padding: 3px 7px; border-radius: var(--radius-pill);
 }
+/* Шильдик больше не обязателен: подсказка, а не требование, поэтому спокойный
+   информационный тон вместо предупреждающего (FR-CAP-06) */
+.slot-req--hint { background: var(--acc2-dim); color: var(--acc2); font-weight: 700; }
 .slot-empty { position: relative; z-index: 1; }
 /* Второстепенный слот кликается целиком: отдельного затвора у него нет */
 .slot-empty--fill {
