@@ -142,13 +142,21 @@ export default function Capture({ user, onReady, onOpenById }) {
   const [error, setError] = useState('')
   const [scanId, setScanId] = useState(null)
   const [status, setStatus] = useState(null)
+  // Запрос на создание скана уже в полёте. Держим отдельно от scanId: тот
+  // появляется только когда сервер ответил, а загрузка нескольких снимков на
+  // судовом канале занимает секунды — всё это время кнопка обязана быть занята.
+  const [sending, setSending] = useState(false)
   const fileInputs = useRef({})
+  // Ключ идемпотентности одной попытки. Живёт до успешной отправки, поэтому
+  // повтор после сетевой ошибки не создаёт второй скан на сервере.
+  const attemptKey = useRef(null)
 
   // Освобождаем object-URL превью, чтобы не течь памятью
   useEffect(() => () => Object.values(shots).forEach(s => URL.revokeObjectURL(s.url)), [])
 
   function attach(kind, file) {
     if (!file) return
+    attemptKey.current = null      // другой набор кадров — другая попытка
     setShots(prev => {
       if (prev[kind]) URL.revokeObjectURL(prev[kind].url)
       return { ...prev, [kind]: { file, url: URL.createObjectURL(file) } }
@@ -158,6 +166,7 @@ export default function Capture({ user, onReady, onOpenById }) {
   }
 
   function drop(kind) {
+    attemptKey.current = null
     setShots(prev => {
       if (prev[kind]) URL.revokeObjectURL(prev[kind].url)
       const next = { ...prev }
@@ -171,18 +180,27 @@ export default function Capture({ user, onReady, onOpenById }) {
   const order = ['nameplate', ...EXTRA_SLOTS.map(s => s.kind)]
   const taken = order.filter(k => shots[k])
   const nameplate = shots.nameplate
-  const busy = Boolean(scanId)
+  // busy — «экран занят»: это и загрузка кадров, и последующее распознавание
+  const busy = sending || Boolean(scanId)
   const canSend = Boolean(nameplate) && vesselId && !busy
 
   async function send() {
+    // Защита от повторного входа: React успевает отрисовать disabled не мгновенно,
+    // а на тач-экране в перчатках это два-три быстрых нажатия подряд
+    if (sending || scanId) return
+    setSending(true)
     setError('')
+
+    // Ключ создаём один раз на попытку, а не на каждый вызов send(): иначе
+    // сервер видит каждый повтор как новый скан и запускает лишнее распознавание
+    if (!attemptKey.current) attemptKey.current = uuid()
+
     const form = new FormData()
     taken.forEach(k => form.append('photos', shots[k].file, `${k}.jpg`))
     form.append('kinds', taken.join(','))
     form.append('meta', JSON.stringify({
       vessel_id: vesselId,
-      // Ключ идемпотентности: повторная отправка не создаст второй скан
-      client_scan_id: uuid(),
+      client_scan_id: attemptKey.current,
     }))
     try {
       const res = await createScan(form)
@@ -190,6 +208,7 @@ export default function Capture({ user, onReady, onOpenById }) {
       setStatus(res.status)
     } catch (e) {
       setError(e.message)
+      setSending(false)          // отпускаем кнопку, чтобы можно было повторить
     }
   }
 
@@ -215,7 +234,8 @@ export default function Capture({ user, onReady, onOpenById }) {
     return () => { stop = true }
   }, [scanId])
 
-  const current = stepIndex(status)
+  // Пока ответа сервера нет, идёт нулевой шаг — загрузка кадров
+  const current = scanId ? stepIndex(status) : 0
 
   return (
     <div className="screen-body">
@@ -303,7 +323,9 @@ export default function Capture({ user, onReady, onOpenById }) {
 
       <button className="btn btn--primary btn--block" type="button"
         disabled={!canSend} onClick={send}>
-        Распознать деталь{taken.length > 1 ? ` · ${taken.length} фото` : ''}
+        {sending && !scanId ? 'Отправляем кадры…'
+          : scanId ? 'Распознаём деталь…'
+          : `Распознать деталь${taken.length > 1 ? ` · ${taken.length} фото` : ''}`}
       </button>
 
       {/* Отключённая кнопка обязана объяснять причину */}
